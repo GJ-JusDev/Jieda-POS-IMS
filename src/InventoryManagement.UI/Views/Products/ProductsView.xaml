@@ -1,0 +1,55 @@
+<UserControl x:Class="InventoryManagement.UI.Views.Products.ProductsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignHeight="600" d:DesignWidth="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Toolbar / Search -->
+        <Border Grid.Row="0" Background="#f8f9fa" Padding="10" BorderBrush="#dee2e6" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                
+                <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBox Grid.Column="1" Width="200" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,15,0" Padding="5"/>
+                
+                <TextBlock Grid.Column="2" Text="Category:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <ComboBox Grid.Column="3" Width="150" HorizontalAlignment="Left" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedFilterCategory}" DisplayMemberPath="CategoryName" Margin="0,0,15,0" Padding="5"/>
+                
+                <StackPanel Grid.Column="4" Orientation="Horizontal">
+                    <Button Content="Search" Command="{Binding SearchCommand}" Padding="15,5" Margin="0,0,10,0"/>
+                    <Button Content="Add Product" Command="{Binding AddCommand}" Padding="15,5" Margin="0,0,10,0" Background="#28a745" Foreground="White"/>
+                    <Button Content="Edit" Command="{Binding EditCommand}" Padding="15,5" Margin="0,0,10,0"/>
+                                        <Button Content="Deactivate" Command="{Binding DeactivateCommand}" Padding="15,5" Background="#dc3545" Foreground="White" Margin="0,0,10,0"/>
+                    <Button Content="Export Barcodes" Command="{Binding ExportBarcodesCommand}" Padding="15,5" Background="#17a2b8" Foreground="White"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="SKU" Binding="{Binding SKU}" Width="100"/>
+                <DataGridTextColumn Header="Barcode" Binding="{Binding Barcode}" Width="120"/>
+                <DataGridTextColumn Header="Product Name" Binding="{Binding ProductName}" Width="*"/>
+                <DataGridTextColumn Header="Category" Binding="{Binding Category.CategoryName}" Width="150"/>
+                <DataGridTextColumn Header="Unit" Binding="{Binding Unit.Symbol}" Width="80"/>
+                <DataGridTextColumn Header="Cost Price" Binding="{Binding CostPrice, StringFormat=C}" Width="100"/>
+                <DataGridTextColumn Header="Selling Price" Binding="{Binding SellingPrice, StringFormat=C}" Width="100"/>
+                <DataGridTextColumn Header="Reorder Level" Binding="{Binding ReorderLevel}" Width="100"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </Grid>
+</UserControl>
+

@@ -1,0 +1,1087 @@
+
+ # Build an Offline Desktop Inventory Management System
+
+ You are a senior software architect and C#/.NET desktop developer. Build a professional, reliable, maintainable **offline Inventory Management System for Windows desktop**.
+
+ The system will be used for everyday business operations, so prioritize **data integrity, reliability, usability, maintainability, security, backup/recovery, and clean architecture** over unnecessary complexity.
+
+ ## 1\. Technology Stack
+
+ Use the following technologies:
+
+ - **Language:** C#
+- **Framework:** Modern .NET (prefer the current LTS version available in the development environment)
+- **Desktop UI:** WPF
+- **Architecture:** Clean Architecture / layered architecture
+- **ORM:** Entity Framework Core
+- **Database:** SQLite
+- **Database access:** EF Core with SQLite provider
+- **Dependency Injection:** Microsoft.Extensions.DependencyInjection
+- **Logging:** Microsoft.Extensions.Logging
+- **Testing:** xUnit
+- **Source control:** Git
+
+ Do NOT use a web application, Electron, PHP, JavaScript-based desktop framework, or cloud database for the core application.
+
+ The application must work **without an internet connection**.
+
+---
+
+ # 2\. Main Goal
+
+ Create a Windows desktop application for managing:
+
+ - Products
+- Categories
+- Units
+- Suppliers
+- Customers
+- Purchases
+- Sales
+- Inventory
+- Stock movements
+- Stock adjustments
+- Returns
+- Users
+- Roles and permissions
+- Reports
+- Audit logs
+- Database backup and restore
+- System settings
+
+ The application should feel like a real commercial business application rather than a demonstration CRUD project.
+
+---
+
+ # 3\. Project Structure
+
+ Use this solution structure:
+
+```
+InventoryManagement/
+│
+├── src/
+│   ├── InventoryManagement.UI/
+│   │   ├── Views/
+│   │   │   ├── Login/
+│   │   │   ├── Dashboard/
+│   │   │   ├── Products/
+│   │   │   ├── Inventory/
+│   │   │   ├── Purchases/
+│   │   │   ├── Sales/
+│   │   │   ├── Suppliers/
+│   │   │   ├── Customers/
+│   │   │   ├── Reports/
+│   │   │   └── Settings/
+│   │   │
+│   │   ├── ViewModels/
+│   │   ├── Resources/
+│   │   ├── Converters/
+│   │   └── App.xaml
+│   │
+│   ├── InventoryManagement.Domain/
+│   │   ├── Entities/
+│   │   ├── Enums/
+│   │   └── Interfaces/
+│   │
+│   ├── InventoryManagement.Application/
+│   │   ├── Services/
+│   │   ├── DTOs/
+│   │   ├── Interfaces/
+│   │   └── Validators/
+│   │
+│   └── InventoryManagement.Infrastructure/
+│       ├── Data/
+│       ├── Repositories/
+│       ├── Backup/
+│       ├── Logging/
+│       └── Services/
+│
+├── tests/
+│   └── InventoryManagement.Tests/
+│
+├── docs/
+│   ├── DatabaseDesign/
+│   ├── Architecture/
+│   └── UserManual/
+│
+└── README.md
+```
+
+ Keep responsibilities separated. Do not put database queries, business logic, and UI code into the same ViewModel or code-behind file.
+
+ Use MVVM for WPF.
+
+---
+
+ # 4\. Database
+
+ Use a local SQLite database.
+
+ The application should create/use:
+
+```
+Inventory.db
+```
+
+ The database must not require internet access.
+
+ Production data should be stored outside the application installation directory, for example:
+
+```
+C:\ProgramData\InventoryManagement\Data\Inventory.db
+```
+
+ Use EF Core migrations for database schema management.
+
+---
+
+ # 5\. Database Tables
+
+ Create the following core tables.
+
+ ## Roles
+
+```
+Roles
+-----
+RoleId
+RoleName
+Description
+```
+
+ Initial roles:
+
+ - Administrator
+- Manager
+- Staff
+
+ ## Users
+
+```
+Users
+-----
+UserId
+Username
+PasswordHash
+FullName
+RoleId
+IsActive
+CreatedAt
+UpdatedAt
+LastLoginAt
+```
+
+ Never store passwords as plain text.
+
+ Use a secure password hashing mechanism.
+
+---
+
+ ## Categories
+
+```
+Categories
+----------
+CategoryId
+CategoryName
+Description
+IsActive
+CreatedAt
+UpdatedAt
+```
+
+ ## Units
+
+```
+Units
+-----
+UnitId
+UnitName
+Symbol
+IsActive
+```
+
+ Examples:
+
+ - Piece / pc
+- Box / box
+- Kilogram / kg
+- Liter / L
+
+---
+
+ ## Products
+
+```
+Products
+--------
+ProductId
+SKU
+Barcode
+ProductName
+Description
+CategoryId
+UnitId
+CostPrice
+SellingPrice
+ReorderLevel
+IsActive
+CreatedAt
+UpdatedAt
+```
+
+ Requirements:
+
+ - SKU should be unique.
+- Barcode should be unique when provided.
+- Product name is required.
+- Prices must not be negative.
+- Reorder level cannot be negative.
+
+ Do not store unnecessary duplicated inventory values without a clear reason.
+
+---
+
+ # 6\. Suppliers
+
+```
+Suppliers
+---------
+SupplierId
+SupplierCode
+SupplierName
+ContactPerson
+Phone
+Email
+Address
+IsActive
+CreatedAt
+UpdatedAt
+```
+
+---
+
+ # 7\. Customers
+
+```
+Customers
+---------
+CustomerId
+CustomerCode
+CustomerName
+Phone
+Email
+Address
+IsActive
+CreatedAt
+UpdatedAt
+```
+
+ Support a default customer such as "Walk-in Customer".
+
+---
+
+ # 8\. Purchasing
+
+ Create:
+
+```
+Purchases
+---------
+PurchaseId
+PurchaseNumber
+SupplierId
+PurchaseDate
+Subtotal
+Discount
+Tax
+TotalAmount
+Status
+Notes
+CreatedBy
+CreatedAt
+UpdatedAt
+```
+
+ And:
+
+```
+PurchaseItems
+-------------
+PurchaseItemId
+PurchaseId
+ProductId
+Quantity
+UnitCost
+TotalCost
+```
+
+ Purchase workflow:
+
+```
+Draft
+  ↓
+Received
+  ↓
+Completed
+```
+
+ When a purchase is received/completed, create the corresponding positive stock transactions.
+
+ Do not modify stock merely because a purchase record was created.
+
+---
+
+ # 9\. Sales
+
+ Create:
+
+```
+Sales
+-----
+SaleId
+InvoiceNumber
+CustomerId
+SaleDate
+Subtotal
+Discount
+Tax
+TotalAmount
+PaymentMethod
+Status
+Notes
+CreatedBy
+CreatedAt
+UpdatedAt
+```
+
+ And:
+
+```
+SaleItems
+---------
+SaleItemId
+SaleId
+ProductId
+Quantity
+UnitPrice
+Discount
+TotalPrice
+```
+
+ When a sale is completed, create negative stock transactions.
+
+ Prevent selling more stock than is available unless an explicit "Allow Negative Stock" setting is enabled.
+
+---
+
+ # 10\. Stock Transactions
+
+ This is the most important inventory table.
+
+ Create:
+
+```
+StockTransactions
+-----------------
+StockTransactionId
+ProductId
+TransactionType
+Quantity
+UnitCost
+ReferenceType
+ReferenceId
+TransactionDate
+CreatedBy
+Notes
+CreatedAt
+```
+
+ Transaction types should include:
+
+ - Purchase
+- Sale
+- SaleReturn
+- PurchaseReturn
+- AdjustmentIncrease
+- AdjustmentDecrease
+- OpeningBalance
+
+ Use positive quantities for stock additions and negative quantities for stock reductions, or use a clearly defined consistent convention.
+
+ The system must preserve the transaction history.
+
+ Do NOT silently delete historical stock transactions.
+
+ Current stock should be calculated from the stock movement history or maintained using a carefully controlled mechanism that remains consistent with the transaction ledger.
+
+---
+
+ # 11\. Inventory
+
+ The inventory screen should show:
+
+```
+SKU
+Barcode
+Product
+Category
+Current Stock
+Unit
+Cost Price
+Selling Price
+Reorder Level
+Stock Status
+```
+
+ Stock status:
+
+ - In Stock
+- Low Stock
+- Out of Stock
+
+ Provide:
+
+ - Search
+- Barcode search
+- Category filter
+- Stock status filter
+- Sorting
+- Pagination if needed
+
+---
+
+ # 12\. Stock Adjustments
+
+ Provide a Stock Adjustment screen.
+
+ User should be able to:
+
+ 1. Select product.
+2. View current stock.
+3. Enter adjustment quantity.
+4. Select reason.
+5. Confirm adjustment.
+6. Create a stock transaction.
+7. Record the user in the audit trail.
+
+ Example reasons:
+
+ - Damaged
+- Lost
+- Found
+- Physical count correction
+- Opening balance
+- Other
+
+ Never simply overwrite the stock quantity without creating an auditable transaction.
+
+---
+
+ # 13\. Returns
+
+ Support:
+
+ ## Sales Returns
+
+```
+SalesReturns
+SalesReturnItems
+```
+
+ ## Purchase Returns
+
+```
+PurchaseReturns
+PurchaseReturnItems
+```
+
+ Returned products must create the correct stock transactions.
+
+---
+
+ # 14\. Audit Logs
+
+ Create:
+
+```
+AuditLogs
+---------
+AuditLogId
+UserId
+Action
+TableName
+RecordId
+Description
+CreatedAt
+```
+
+ Log important operations such as:
+
+ - Login
+- Logout
+- Product creation
+- Product update
+- Product deletion/deactivation
+- Purchase creation
+- Purchase completion
+- Sale creation
+- Sale completion
+- Stock adjustment
+- Return
+- User creation
+- User modification
+- Backup
+- Restore
+- Settings changes
+
+---
+
+ # 15\. Dashboard
+
+ Create a professional dashboard showing:
+
+ - Total products
+- Total inventory quantity
+- Inventory value
+- Low-stock products
+- Out-of-stock products
+- Today's sales
+- Today's purchases
+- Recent transactions
+- Recent stock movements
+
+ Use cards and simple charts where useful.
+
+ Do not overload the dashboard with unnecessary graphics.
+
+---
+
+ # 16\. Product Management
+
+ Create a professional Product Management screen.
+
+ Features:
+
+ - Add product
+- Edit product
+- Deactivate product
+- Search
+- Filter
+- Sort
+- Barcode
+- SKU
+- Category
+- Unit
+- Cost price
+- Selling price
+- Reorder level
+
+ Ask for confirmation before destructive actions.
+
+ Prefer deactivation over permanent deletion when the product has transaction history.
+
+---
+
+ # 17\. Barcode Support
+
+ Support USB barcode scanners.
+
+ Assume the barcode scanner behaves like a keyboard.
+
+ Provide fast barcode entry in:
+
+ - Sales
+- Product search
+- Inventory
+- Purchase entry
+
+ Scanning a barcode should quickly locate the product.
+
+---
+
+ # 18\. Reports
+
+ Create a Reports section.
+
+ At minimum:
+
+ - Current Inventory
+- Low Stock
+- Out of Stock
+- Stock Movement
+- Stock Valuation
+- Purchases
+- Sales
+- Sales by Date
+- Purchases by Date
+- Product Transaction History
+- Supplier Purchases
+- Customer Sales
+- Audit Log
+
+ Allow filtering by:
+
+ - Date
+- Product
+- Category
+- Supplier
+- Customer
+- Transaction type
+
+ Provide print/export functionality where practical.
+
+---
+
+ # 19\. Backup and Restore
+
+ This is a critical requirement.
+
+ The application must support:
+
+ - Manual backup
+- Automatic backup
+- Restore backup
+- Backup location configuration
+- Backup history
+- Backup validation
+
+ Example:
+
+```
+C:\ProgramData\InventoryManagement\
+│
+├── Data\
+│   └── Inventory.db
+│
+├── Backups\
+│   ├── Inventory_2026-09-11.db
+│   ├── Inventory_2026-09-12.db
+│   └── Inventory_2026-09-13.db
+│
+└── Logs\
+    └── application.log
+```
+
+ Create automatic backups based on a configurable schedule.
+
+ Default:
+
+ - Backup once per day.
+- Keep the most recent 30 backups.
+
+ Before restoring:
+
+ - Require confirmation.
+- Create a backup of the current database.
+- Validate the selected backup.
+- Clearly warn the user that restore will replace current data.
+
+ Do not delete the current database before a valid backup has been created.
+
+---
+
+ # 20\. Offline Requirement
+
+ The system must continue working when:
+
+ - Internet is unavailable.
+- Wi-Fi is unavailable.
+- Cloud services are unavailable.
+
+ Do not make the application dependent on an online API for normal inventory operations.
+
+ All normal operations must use the local SQLite database.
+
+---
+
+ # 21\. Data Integrity
+
+ This is extremely important.
+
+ Use database transactions for operations such as:
+
+```
+Complete Purchase
+    ↓
+Save Purchase
+    ↓
+Save Purchase Items
+    ↓
+Create Stock Transactions
+    ↓
+Commit
+```
+
+ And:
+
+```
+Complete Sale
+    ↓
+Validate Stock
+    ↓
+Save Sale
+    ↓
+Save Sale Items
+    ↓
+Create Stock Transactions
+    ↓
+Commit
+```
+
+ If any part fails, roll back the complete operation.
+
+ Never leave a sale saved without its corresponding stock movement.
+
+ Never leave a purchase saved as completed without its corresponding stock movement.
+
+---
+
+ # 22\. UI Design
+
+ Create a modern professional Windows desktop interface.
+
+ Use:
+
+ - Sidebar navigation
+- Top header
+- Dashboard cards
+- Data grids
+- Search boxes
+- Filters
+- Dialog windows/forms
+- Consistent buttons
+- Clear validation messages
+- Confirmation dialogs
+
+ Suggested navigation:
+
+```
+Dashboard
+
+Products
+  ├── Products
+  ├── Categories
+  └── Units
+
+Inventory
+  ├── Stock Overview
+  ├── Stock In
+  ├── Stock Out
+  ├── Adjustments
+  └── Stock History
+
+Purchasing
+  ├── Purchases
+  └── Suppliers
+
+Sales
+  ├── Sales
+  ├── Customers
+  └── Returns
+
+Reports
+
+Administration
+  ├── Users
+  ├── Roles
+  ├── Backup & Restore
+  ├── Audit Logs
+  └── Settings
+```
+
+---
+
+ # 23\. Permissions
+
+ Implement role-based permissions.
+
+ Example:
+
+ ### Administrator
+
+ Full access.
+
+ ### Manager
+
+ Access to:
+
+ - Products
+- Inventory
+- Purchases
+- Sales
+- Reports
+- Suppliers
+- Customers
+
+ But restrict sensitive system administration where appropriate.
+
+ ### Staff
+
+ Access primarily to:
+
+ - Sales
+- Inventory lookup
+- Stock-in/out where permitted
+
+ Do not rely only on hiding buttons. Enforce authorization in the application/service layer as well.
+
+---
+
+ # 24\. Error Handling
+
+ The application must never crash because of a normal user mistake.
+
+ Handle:
+
+ - Invalid input
+- Duplicate SKU
+- Duplicate barcode
+- Missing product
+- Insufficient stock
+- Database errors
+- File errors
+- Backup errors
+- Restore errors
+
+ Display friendly messages to the user.
+
+ Log technical details for troubleshooting.
+
+ Never expose stack traces to normal users.
+
+---
+
+ # 25\. Validation
+
+ Validate all important fields.
+
+ Examples:
+
+ - Required fields
+- Numeric ranges
+- Decimal precision
+- Negative quantities
+- Duplicate SKU
+- Duplicate barcode
+- Invalid dates
+- Invalid prices
+- Invalid stock adjustments
+
+ Use validation at both the UI/application level and database level where appropriate.
+
+---
+
+ # 26\. Database Safety
+
+ Use:
+
+ - Foreign keys
+- Unique constraints
+- Indexes
+- Appropriate decimal/numeric types
+- Required fields
+- Transactions
+- EF Core migrations
+
+ Create indexes for commonly searched fields such as:
+
+ - SKU
+- Barcode
+- ProductName
+- PurchaseNumber
+- InvoiceNumber
+- TransactionDate
+
+---
+
+ # 27\. Testing
+
+ Create automated tests for critical business logic.
+
+ At minimum test:
+
+ - Product creation
+- Duplicate SKU prevention
+- Duplicate barcode prevention
+- Purchase calculation
+- Sale calculation
+- Stock increase
+- Stock decrease
+- Insufficient stock
+- Stock adjustment
+- Returns
+- Backup creation
+- Restore validation
+- User permissions
+
+ Inventory calculations must have particularly strong test coverage.
+
+---
+
+ # 28\. Development Strategy
+
+ Do NOT attempt to generate the entire application blindly in one step.
+
+ Build it incrementally.
+
+ Recommended order:
+
+ ### Phase 1 — Foundation
+
+ - Create solution
+- Create projects
+- Configure WPF
+- Configure dependency injection
+- Configure EF Core
+- Configure SQLite
+- Create migrations
+- Create database
+- Create basic logging
+
+ ### Phase 2 — Authentication
+
+ - Users
+- Roles
+- Login
+- Password hashing
+- Permissions
+
+ ### Phase 3 — Master Data
+
+ - Products
+- Categories
+- Units
+- Suppliers
+- Customers
+
+ ### Phase 4 — Inventory
+
+ - Stock transactions
+- Stock overview
+- Stock adjustments
+- Stock history
+
+ ### Phase 5 — Purchasing
+
+ - Purchase entry
+- Purchase items
+- Receiving
+- Stock-in
+
+ ### Phase 6 — Sales
+
+ - Sales screen
+- Barcode scanning
+- Sale items
+- Stock validation
+- Stock-out
+
+ ### Phase 7 — Returns
+
+ - Sales returns
+- Purchase returns
+
+ ### Phase 8 — Reports
+
+ - Inventory reports
+- Sales reports
+- Purchase reports
+- Stock movement reports
+
+ ### Phase 9 — Backup
+
+ - Automatic backup
+- Manual backup
+- Restore
+- Backup retention
+
+ ### Phase 10 — Audit and Polish
+
+ - Audit logs
+- Error handling
+- UI improvements
+- Performance
+- Testing
+- Documentation
+
+---
+
+ # 29\. Important Design Rules
+
+ Follow these rules throughout development:
+
+ 1. Do not put business logic directly into WPF code-behind.
+2. Use MVVM.
+3. Keep database access in Infrastructure.
+4. Keep business rules in Application/Domain.
+5. Use dependency injection.
+6. Use async database operations where appropriate.
+7. Use transactions for multi-step inventory operations.
+8. Never silently alter historical stock transactions.
+9. Never store plaintext passwords.
+10. Never depend on internet connectivity for normal operation.
+11. Never permanently delete transactional records unless there is a compelling reason.
+12. Prefer deactivation/archiving for products, suppliers, and customers with historical transactions.
+13. Validate user input.
+14. Log unexpected errors.
+15. Make backup and restore safe and explicit.
+16. Keep the code readable and maintainable.
+17. Avoid unnecessary third-party dependencies.
+18. Do not hard-code configuration values.
+19. Use configuration/settings for database and backup locations.
+20. Do not sacrifice data integrity for convenience.
+
+---
+
+ # 30\. Deliverables
+
+ At each development stage, provide:
+
+ - Working code
+- Updated database migrations
+- Tests
+- Documentation
+- Explanation of important architectural decisions
+
+ Before moving to the next phase, verify that the current phase builds and runs successfully.
+
+ Do not leave placeholder methods such as:
+
+```
+// TODO: implement
+```
+
+ for core functionality.
+
+ If a feature is not implemented yet, clearly identify it rather than pretending it works.
+
+---
+
+ # 31\. First Task
+
+ Start with **Phase 1 only**.
+
+ Before writing extensive code:
+
+ 1. Create the solution.
+2. Create the projects.
+3. Configure project references.
+4. Configure WPF and MVVM.
+5. Configure dependency injection.
+6. Configure EF Core with SQLite.
+7. Configure the initial database context.
+8. Create the initial entities needed for the foundation.
+9. Configure logging.
+10. Create the first migration.
+11. Make the application start successfully.
+12. Create a basic application shell.
+13. Verify the SQLite database can be created/opened.
+14. Add a README explaining how to build and run the project.
+
+ After completing Phase 1, summarize what was implemented, identify any issues, and wait before proceeding to Phase 2.
+
+ The priority is a **stable, maintainable, offline-first inventory system with strong data integrity and reliable backup/recovery**, not simply producing as much code as possible.
+
+ You can paste that as the **main project prompt**. I deliberately made it tell Antigravity to work **phase-by-phase**, because an inventory system has enough interconnected parts that asking an AI coding agent to generate everything at once can create difficult-to-fix database and business-logic problems.
