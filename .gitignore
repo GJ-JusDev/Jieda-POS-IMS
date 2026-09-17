@@ -1,0 +1,28 @@
+# Visual Studio / .NET build artifacts
+bin/
+obj/
+Debug/
+Release/
+.vs/
+.vscode/
+
+# Common compiled output
+*.dll
+*.exe
+*.pdb
+*.cache
+*.deps.json
+*.runtimeconfig.json
+*.nuget.*
+*.AssemblyInfo.cs
+*.GeneratedMSBuildEditorConfig.editorconfig
+*.g.cs
+*.g.resources
+*.baml
+*.Up2Date
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
