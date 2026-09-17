@@ -1,0 +1,31 @@
+<UserControl x:Class="InventoryManagement.UI.Views.Settings.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignHeight="600" d:DesignWidth="800">
+    <Grid>
+        <StackPanel Margin="20">
+            <TextBlock Text="System Settings &amp; Administration" FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
+
+            <Border Background="#f8f9fa" Padding="20" BorderBrush="#dee2e6" BorderThickness="1" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Database Backup &amp; Restore" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                    <TextBlock Text="The system automatically creates a backup every time the application is closed. You can also manually create a backup or restore from a previous file." TextWrapping="Wrap" Margin="0,0,0,20"/>
+                    
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="Create Manual Backup" Command="{Binding ManualBackupCommand}" Padding="15,10" Margin="0,0,15,0" Background="#007bff" Foreground="White"/>
+                        <Button Content="Restore from Backup" Command="{Binding RestoreBackupCommand}" Padding="15,10" Background="#dc3545" Foreground="White"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            
+            <Border Background="#f8f9fa" Padding="20" BorderBrush="#dee2e6" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="Note" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                    <TextBlock Text="Automatic backups are stored in the 'Backups' folder next to your main database file. The system automatically deletes backups older than 7 days to save space." TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</UserControl>
