@@ -46,7 +46,14 @@
                 
                 <StackPanel Grid.Column="0">
                     <TextBlock Text="Product" Foreground="{StaticResource TextSecondaryBrush}" FontWeight="SemiBold" Margin="0,0,0,5"/>
-                    <ComboBox ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}" DisplayMemberPath="ProductName" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}" DisplayMemberPath="ProductName" />
+                        <Button Grid.Column="1" Content="📷" Command="{Binding OpenCameraScannerCommand}" Margin="5,0,0,0" Width="30" Background="#6c757d" Foreground="White" BorderThickness="0" ToolTip="Camera Scan"/>
+                    </Grid>
                 </StackPanel>
                 
                 <StackPanel Grid.Column="2">

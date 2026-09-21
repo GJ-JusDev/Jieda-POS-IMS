@@ -90,6 +90,7 @@ public partial class App : System.Windows.Application
                 services.AddTransient<IAuditLogService, AuditLogService>();
                 services.AddTransient<ISystemDiagnosticsService, SystemDiagnosticsService>();
                 services.AddTransient<IDashboardService, DashboardService>();
+                services.AddTransient<IReceiptPdfService, InventoryManagement.Infrastructure.Services.QuestPdfReceiptService>();
                 
                 services.AddSingleton<IUserConfigurationService, UserConfigurationService>();
                 
@@ -121,6 +122,9 @@ public partial class App : System.Windows.Application
                 services.AddTransient<SettingsViewModel>();
                 services.AddTransient<AuditLogsViewModel>();
                 services.AddTransient<DashboardViewModel>();
+                
+                services.AddTransient<InventoryManagement.UI.ViewModels.Base.CameraScannerViewModel>();
+                services.AddTransient<InventoryManagement.UI.Views.Scanner.CameraScannerWindow>();
             })
             .Build();
     }
@@ -129,6 +133,17 @@ public partial class App : System.Windows.Application
     {
         try
         {
+            var culture = (System.Globalization.CultureInfo)new System.Globalization.CultureInfo("en-PH").Clone();
+            culture.NumberFormat.CurrencySymbol = "₱";
+            System.Threading.Thread.CurrentThread.CurrentCulture = culture;
+            System.Threading.Thread.CurrentThread.CurrentUICulture = culture;
+            System.Globalization.CultureInfo.DefaultThreadCurrentCulture = culture;
+            System.Globalization.CultureInfo.DefaultThreadCurrentUICulture = culture;
+            FrameworkElement.LanguageProperty.OverrideMetadata(
+                typeof(FrameworkElement),
+                new FrameworkPropertyMetadata(
+                    System.Windows.Markup.XmlLanguage.GetLanguage(culture.IetfLanguageTag)));
+
             await _host.StartAsync();
 
             using (var scope = _host.Services.CreateScope())
@@ -202,25 +217,25 @@ public partial class App : System.Windows.Application
                 {
                     dbContext.Units.AddRange(
                         new InventoryManagement.Domain.Entities.Unit { UnitName = "pcs", Symbol = "pcs" },
-                        new InventoryManagement.Domain.Entities.Unit { UnitName = "roll", Symbol = "roll" },
-                        new InventoryManagement.Domain.Entities.Unit { UnitName = "m", Symbol = "m" },
-                        new InventoryManagement.Domain.Entities.Unit { UnitName = "kg", Symbol = "kg" },
-                        new InventoryManagement.Domain.Entities.Unit { UnitName = "box", Symbol = "box" }
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "Box", Symbol = "Box" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "Kilogram", Symbol = "kg" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "Meter", Symbol = "m" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "Liter", Symbol = "L" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "Roll", Symbol = "Roll" }
                     );
                     dbContext.SaveChanges();
                 }
                 else
                 {
+                    var desiredUnits = new[] { "pcs", "Box", "Kilogram", "Meter", "Liter", "Roll" };
                     var existingUnits = dbContext.Units.Select(u => u.UnitName).ToList();
-                    if (!existingUnits.Contains("pcs")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "pcs", Symbol = "pcs" });
-                    if (!existingUnits.Contains("roll")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "roll", Symbol = "roll" });
-                    if (!existingUnits.Contains("m")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "m", Symbol = "m" });
                     
-                    var oldPiece = dbContext.Units.FirstOrDefault(u => u.UnitName == "Piece");
-                    if (oldPiece != null) {
-                        oldPiece.UnitName = "pcs";
-                        oldPiece.Symbol = "pcs";
+                    foreach(var d in desiredUnits) {
+                        if (!existingUnits.Any(e => e.Equals(d, StringComparison.OrdinalIgnoreCase))) {
+                            dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = d, Symbol = d });
+                        }
                     }
+                    
                     dbContext.SaveChanges();
                 }
 

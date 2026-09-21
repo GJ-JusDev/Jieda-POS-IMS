@@ -68,6 +68,7 @@ public class SalesViewModel : ViewModelBase, InventoryManagement.Application.Int
     private readonly IProductService _productService;
     private readonly ICustomerService _customerService;
     private readonly IAuthenticationService _authService;
+    private readonly IReceiptPdfService _receiptPdfService;
 
     public ObservableCollection<SaleItemModel> CartItems { get; set; } = new();
     public ObservableCollection<Product> AvailableProducts { get; set; } = new();
@@ -97,18 +98,21 @@ public class SalesViewModel : ViewModelBase, InventoryManagement.Application.Int
     public ICommand AddSelectedProductCommand { get; }
     public ICommand RemoveItemCommand { get; }
     public ICommand CheckoutCommand { get; }
+    public ICommand OpenCameraScannerCommand { get; }
 
-    public SalesViewModel(ISaleService saleService, IProductService productService, ICustomerService customerService, IAuthenticationService authService)
+    public SalesViewModel(ISaleService saleService, IProductService productService, ICustomerService customerService, IAuthenticationService authService, IReceiptPdfService receiptPdfService)
     {
         _saleService = saleService;
         _productService = productService;
         _customerService = customerService;
         _authService = authService;
+        _receiptPdfService = receiptPdfService;
 
         ScanBarcodeCommand = new RelayCommand(async _ => await ProcessBarcodeAsync());
         AddSelectedProductCommand = new RelayCommand(async _ => await AddSelectedProductAsync(), _ => SelectedProduct != null);
         RemoveItemCommand = new RelayCommand<SaleItemModel>(RemoveItem);
         CheckoutCommand = new RelayCommand(async _ => await CheckoutAsync(), _ => CartItems.Any());
+        OpenCameraScannerCommand = new RelayCommand(_ => OpenCameraScanner());
         
         CartItems.CollectionChanged += (s, e) => UpdateTotal();
         
@@ -135,6 +139,18 @@ public class SalesViewModel : ViewModelBase, InventoryManagement.Application.Int
     {
         BarcodeInput = barcode;
         await ProcessBarcodeAsync();
+    }
+
+    private void OpenCameraScanner()
+    {
+        var scannerWindow = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.Views.Scanner.CameraScannerWindow>();
+        var vm = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.ViewModels.Base.CameraScannerViewModel>();
+        scannerWindow.DataContext = vm;
+        vm.OnBarcodeDetected = barcode => 
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() => OnBarcodeScanned(barcode));
+        };
+        scannerWindow.ShowDialog();
     }
 
     private async Task ProcessBarcodeAsync()
@@ -235,6 +251,8 @@ public class SalesViewModel : ViewModelBase, InventoryManagement.Application.Int
     private void UpdateTotal()
     {
         TotalAmount = CartItems.Sum(i => i.TotalPrice);
+        System.Windows.Application.Current.Dispatcher.InvokeAsync(() => 
+            System.Windows.Input.CommandManager.InvalidateRequerySuggested());
     }
 
     private async Task CheckoutAsync()
@@ -272,7 +290,40 @@ public class SalesViewModel : ViewModelBase, InventoryManagement.Application.Int
                 allowNegativeStock: false
             );
 
-            MessageBox.Show($"Sale completed successfully!\nInvoice: {sale.InvoiceNumber}\nTotal: {sale.TotalAmount:C}", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            // Fetch the fully populated sale so it includes Product references for the receipt
+            var fullSale = await _saleService.GetSaleAsync(sale.SaleId);
+            
+            var result = MessageBox.Show(
+                $"Sale completed successfully!\nInvoice: {sale.InvoiceNumber}\nTotal: {sale.TotalAmount:C}\n\nWould you like to save the receipt as a PDF?",
+                "Sale Success",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (result == MessageBoxResult.Yes && fullSale != null)
+            {
+                var safeInvoiceNumber = string.Join("_", sale.InvoiceNumber.Split(System.IO.Path.GetInvalidFileNameChars()));
+                var dialog = new Microsoft.Win32.SaveFileDialog
+                {
+                    Title = "Save Receipt as PDF",
+                    Filter = "PDF Documents (*.pdf)|*.pdf",
+                    FileName = $"Invoice_{safeInvoiceNumber}.pdf",
+                    DefaultExt = ".pdf"
+                };
+
+                if (dialog.ShowDialog() == true)
+                {
+                    try
+                    {
+                        await _receiptPdfService.GenerateReceiptAsync(fullSale, dialog.FileName);
+                    }
+                    catch (Exception pdfEx)
+                    {
+                        // Sale is already saved, don't rollback. Just inform the user.
+                        // In a real app, we would log `pdfEx` here.
+                        MessageBox.Show($"Sale completed, but the receipt could not be generated.\n\nDetails: {pdfEx.Message}", "PDF Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+            }
             
             CartItems.Clear();
             UpdateTotal();

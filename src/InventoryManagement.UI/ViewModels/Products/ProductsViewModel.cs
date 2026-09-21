@@ -153,7 +153,7 @@ public class ProductsViewModel : ViewModelBase
         {
             Title = "Export Barcodes to PDF",
             Filter = "PDF Documents (*.pdf)|*.pdf",
-            FileName = "ProductBarcodes_{DateTime.Now:yyyyMMdd}.pdf"
+            FileName = $"ProductBarcodes_{DateTime.Now:yyyyMMdd}.pdf"
         };
 
         if (dialog.ShowDialog() == true)
@@ -210,11 +210,11 @@ public class ProductsViewModel : ViewModelBase
                 })
                 .GeneratePdf(dialog.FileName);
 
-                MessageBox.Show("Barcodes successfully exported to:\n{dialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"Barcodes successfully exported to:\n{dialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error exporting barcodes: {ex.Message}", "Export Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Error exporting barcodes: {ex.Message}", "Export Failed", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
     }

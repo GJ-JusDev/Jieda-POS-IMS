@@ -8,6 +8,7 @@ using InventoryManagement.Application.Interfaces;
 using InventoryManagement.Domain.Entities;
 using InventoryManagement.Domain.Enums;
 using InventoryManagement.UI.ViewModels.Base;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InventoryManagement.UI.ViewModels.Inventory;
 
@@ -106,6 +107,7 @@ public class StockAdjustmentViewModel : ViewModelBase, IBarcodeScannerTarget
 
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand OpenCameraScannerCommand { get; }
 
     public StockAdjustmentViewModel(IInventoryService inventoryService, IProductService productService, IAuthenticationService authService)
     {
@@ -115,6 +117,7 @@ public class StockAdjustmentViewModel : ViewModelBase, IBarcodeScannerTarget
 
         SaveCommand = new RelayCommand(async _ => await SaveAsync(), _ => SelectedProduct != null && Quantity != 0);
         CancelCommand = new RelayCommand(_ => CloseAction?.Invoke());
+        OpenCameraScannerCommand = new RelayCommand(_ => OpenCameraScanner());
     }
 
     public async Task LoadProductAsync(int productId)
@@ -176,6 +179,18 @@ public class StockAdjustmentViewModel : ViewModelBase, IBarcodeScannerTarget
         {
             MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void OpenCameraScanner()
+    {
+        var scannerWindow = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.Views.Scanner.CameraScannerWindow>();
+        var vm = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.ViewModels.Base.CameraScannerViewModel>();
+        scannerWindow.DataContext = vm;
+        vm.OnBarcodeDetected = barcode => 
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() => OnBarcodeScanned(barcode));
+        };
+        scannerWindow.ShowDialog();
     }
 
     public async void OnBarcodeScanned(string barcode)

@@ -23,7 +23,10 @@
         </Grid.ColumnDefinitions>
 
         <TextBlock Text="Product:" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
-        <TextBlock Text="{Binding SelectedProduct.ProductName, TargetNullValue='(Scan barcode or select product)'}" Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Margin="0,8"/>
+        <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,8">
+            <TextBlock Text="{Binding SelectedProduct.ProductName, TargetNullValue='(Scan barcode or select product)'}" VerticalAlignment="Center"/>
+            <Button Content="📷 Scan" Command="{Binding OpenCameraScannerCommand}" Margin="15,0,0,0" Padding="10,2" Background="#6c757d" Foreground="White" BorderThickness="0" ToolTip="Camera Scan"/>
+        </StackPanel>
 
         <TextBlock Text="Current Stock:" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}"/>
         <TextBlock Text="{Binding CurrentStock}" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" Margin="0,8" FontSize="16" FontWeight="Bold"/>

@@ -109,12 +109,12 @@ public class ProductEditorViewModel : ViewModelBase
         }
     }
 
-        public string TotalInitialValueText
+        public decimal TotalInitialValue
     {
         get
         {
-            if (Product == null) return "";
-            return (InitialStock * Product.CostPrice).ToString("C");
+            if (Product == null) return 0;
+            return InitialStock * Product.CostPrice;
         }
     }
 
@@ -126,7 +126,7 @@ public class ProductEditorViewModel : ViewModelBase
                         if (string.IsNullOrWhiteSpace(value)) InitialStock = 0;
             else if (decimal.TryParse(value, out decimal parsed)) InitialStock = parsed;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(TotalInitialValueText));
+            OnPropertyChanged(nameof(TotalInitialValue));
         }
     }
 
@@ -140,7 +140,7 @@ public class ProductEditorViewModel : ViewModelBase
                                 if (string.IsNullOrWhiteSpace(value)) Product.CostPrice = 0;
                 else if (decimal.TryParse(value, out decimal parsed)) Product.CostPrice = parsed;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(TotalInitialValueText));
+                OnPropertyChanged(nameof(TotalInitialValue));
                 CalculateSellingPrice();
             }
         }
@@ -304,7 +304,7 @@ public class ProductEditorViewModel : ViewModelBase
         }
         Product.CostPrice = total;
         OnPropertyChanged(nameof(CostPriceText));
-        OnPropertyChanged(nameof(TotalInitialValueText));
+        OnPropertyChanged(nameof(TotalInitialValue));
         CalculateSellingPrice();
     }
 

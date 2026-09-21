@@ -53,6 +53,7 @@
                                 </TextBox.InputBindings>
                             </TextBox>
                             <Button Content="Add" Command="{Binding ScanBarcodeCommand}" Margin="10,0,0,0" Padding="15,2" Style="{StaticResource PrimaryButton}" Height="35"/>
+                            <Button Content="📷 Camera" Command="{Binding OpenCameraScannerCommand}" Margin="10,0,0,0" Padding="15,2" Height="35" Background="#6c757d" Foreground="White" BorderThickness="0"/>
                         </WrapPanel>
                     </StackPanel>
                 </Border>

@@ -135,7 +135,7 @@ public class UnitService : BaseMasterDataService<Unit>, IUnitService
     
     public override async Task<IEnumerable<Unit>> GetAllAsync()
     {
-        return await _context.Units.Where(u => u.IsActive).ToListAsync();
+        return await _context.Units.Where(u => u.IsActive).OrderBy(u => u.UnitName).ToListAsync();
     }
 }
 

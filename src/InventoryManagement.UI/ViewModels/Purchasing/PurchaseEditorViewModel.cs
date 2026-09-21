@@ -8,6 +8,7 @@ using InventoryManagement.Application.Interfaces;
 using InventoryManagement.Domain.Entities;
 using InventoryManagement.Domain.Enums;
 using InventoryManagement.UI.ViewModels.Base;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InventoryManagement.UI.ViewModels.Purchasing;
 
@@ -66,6 +67,7 @@ public class PurchaseEditorViewModel : ViewModelBase, InventoryManagement.Applic
     public ICommand RemoveItemCommand { get; }
     public ICommand SaveCommand { get; }
     public ICommand CancelCommand { get; }
+    public ICommand OpenCameraScannerCommand { get; }
 
     public PurchaseEditorViewModel(IPurchaseService purchaseService, ISupplierService supplierService, IProductService productService, IAuthenticationService authService)
     {
@@ -78,6 +80,7 @@ public class PurchaseEditorViewModel : ViewModelBase, InventoryManagement.Applic
         RemoveItemCommand = new RelayCommand(async _ => await RemoveItemAsync(), _ => SelectedItem != null);
         SaveCommand = new RelayCommand(async _ => await SaveAsync());
         CancelCommand = new RelayCommand(_ => CloseAction?.Invoke());
+        OpenCameraScannerCommand = new RelayCommand(_ => OpenCameraScanner());
     }
 
     public async Task LoadDataAsync(Purchase? existingPurchase = null)
@@ -211,6 +214,18 @@ public class PurchaseEditorViewModel : ViewModelBase, InventoryManagement.Applic
         }
         
         CloseAction?.Invoke();
+    }
+
+    private void OpenCameraScanner()
+    {
+        var scannerWindow = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.Views.Scanner.CameraScannerWindow>();
+        var vm = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.ViewModels.Base.CameraScannerViewModel>();
+        scannerWindow.DataContext = vm;
+        vm.OnBarcodeDetected = barcode => 
+        {
+            System.Windows.Application.Current.Dispatcher.Invoke(() => OnBarcodeScanned(barcode));
+        };
+        scannerWindow.ShowDialog();
     }
 
     public async void OnBarcodeScanned(string barcode)
