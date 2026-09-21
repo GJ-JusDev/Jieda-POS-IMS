@@ -168,7 +168,7 @@ public class ProductEditorViewModel : ViewModelBase
             if (Product != null)
             {
                 if (string.IsNullOrWhiteSpace(value)) Product.MarkupPercentage = 0;
-                else if (decimal.TryParse(value, out decimal parsed)) Product.MarkupPercentage = parsed;
+                else if (decimal.TryParse(value, out decimal parsed) && parsed >= 0) Product.MarkupPercentage = parsed;
                 OnPropertyChanged();
                 CalculateSellingPrice();
             }
@@ -304,6 +304,7 @@ public class ProductEditorViewModel : ViewModelBase
         }
         Product.CostPrice = total;
         OnPropertyChanged(nameof(CostPriceText));
+        OnPropertyChanged(nameof(TotalInitialValueText));
         CalculateSellingPrice();
     }
 
@@ -349,7 +350,7 @@ public class ProductEditorViewModel : ViewModelBase
                 if (InitialStock > 0)
                 {
                     var userId = _authService.CurrentUser?.UserId ?? 1;
-                    await _inventoryService.AddStockAdjustmentAsync(addedProduct.ProductId, InitialStock, "Initial Stock entry", userId);
+                    await _inventoryService.AddStockAdjustmentAsync(addedProduct.ProductId, InventoryManagement.Domain.Enums.StockTransactionType.OpeningBalance, InitialStock, "Initial Stock entry", userId);
                 }
             }
             else

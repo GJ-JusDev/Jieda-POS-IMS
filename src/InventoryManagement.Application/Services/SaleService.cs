@@ -12,14 +12,19 @@ namespace InventoryManagement.Application.Services;
 public class SaleService : ISaleService
 {
     private readonly IInventoryDbContext _context;
+    private readonly IAuthorizationService _authzService;
 
-    public SaleService(IInventoryDbContext context)
+    public SaleService(IInventoryDbContext context, IAuthorizationService authzService)
     {
         _context = context;
+        _authzService = authzService;
     }
 
     public async Task<Sale> CreateSaleAsync(int customerId, int createdBy, IEnumerable<SaleItem> items, string paymentMethod, string? notes, bool allowNegativeStock = false)
     {
+        if (!_authzService.HasPermission(Permission.CompleteSale))
+            throw new UnauthorizedAccessException("You do not have permission to complete sales.");
+
         var saleItems = items.ToList();
         if (!saleItems.Any()) throw new Exception("Sale must contain at least one item.");
 
@@ -37,7 +42,8 @@ public class SaleService : ISaleService
 
         decimal subtotal = 0;
 
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync();
+        var isInMemory = ((DbContext)_context).Database.ProviderName?.Contains("InMemory") == true;
+        var transaction = isInMemory ? null : await ((DbContext)_context).Database.BeginTransactionAsync();
         try
         {
             foreach (var item in saleItems)
@@ -48,7 +54,7 @@ public class SaleService : ISaleService
                 // Check stock
                 if (!allowNegativeStock)
                 {
-                                        var txs = await _context.StockTransactions
+                    var txs = await _context.StockTransactions
                         .Where(st => st.ProductId == item.ProductId)
                         .Select(st => st.Quantity)
                         .ToListAsync();
@@ -96,7 +102,7 @@ public class SaleService : ISaleService
             var audit = new AuditLog
             {
                 UserId = createdBy,
-                Action = "CreateSale",
+                Action = "SaleCompleted",
                 TableName = "Sales",
                 RecordId = sale.SaleId.ToString(),
                 Description = $"Completed sale {sale.InvoiceNumber} for {sale.TotalAmount:C}."
@@ -104,14 +110,18 @@ public class SaleService : ISaleService
             _context.AuditLogs.Add(audit);
 
             await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            if (transaction != null) await transaction.CommitAsync();
 
             return sale;
         }
         catch
         {
-            await transaction.RollbackAsync();
+            if (transaction != null) await transaction.RollbackAsync();
             throw;
+        }
+        finally
+        {
+            if (transaction != null) await transaction.DisposeAsync();
         }
     }
 
@@ -135,6 +145,70 @@ public class SaleService : ISaleService
     private string GenerateInvoiceNumber()
     {
         return $"INV-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 6).ToUpper()}";
+    }
+    public async Task<InventoryManagement.Application.DTOs.Criteria.PagedResult<Sale>> SearchSalesAsync(InventoryManagement.Application.DTOs.Criteria.SalesSearchCriteria criteria)
+    {
+        var query = _context.Sales
+            .Include(s => s.Customer)
+            .AsQueryable();
+
+        if (criteria.DateFrom.HasValue)
+        {
+            query = query.Where(s => s.SaleDate >= criteria.DateFrom.Value);
+        }
+        if (criteria.DateTo.HasValue)
+        {
+            var endOfDay = criteria.DateTo.Value.AddDays(1);
+            query = query.Where(s => s.SaleDate < endOfDay);
+        }
+        if (criteria.CustomerId.HasValue)
+        {
+            query = query.Where(s => s.CustomerId == criteria.CustomerId.Value);
+        }
+        if (criteria.UserId.HasValue)
+        {
+            query = query.Where(s => s.CreatedBy == criteria.UserId.Value);
+        }
+        if (criteria.Status.HasValue)
+        {
+            query = query.Where(s => s.Status == criteria.Status.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(criteria.SearchText))
+        {
+            var text = criteria.SearchText.Trim();
+            query = query.Where(s => s.InvoiceNumber.Contains(text) || (s.Customer != null && s.Customer.CustomerName.Contains(text)));
+        }
+
+        var totalCount = await query.CountAsync();
+
+        if (string.IsNullOrEmpty(criteria.SortColumn))
+        {
+            query = query.OrderByDescending(s => s.SaleDate);
+        }
+        else
+        {
+            query = criteria.SortColumn switch
+            {
+                "InvoiceNumber" => criteria.SortDescending ? query.OrderByDescending(s => s.InvoiceNumber) : query.OrderBy(s => s.InvoiceNumber),
+                "SaleDate" => criteria.SortDescending ? query.OrderByDescending(s => s.SaleDate) : query.OrderBy(s => s.SaleDate),
+                "Customer" => criteria.SortDescending ? query.OrderByDescending(s => s.Customer != null ? s.Customer.CustomerName : string.Empty) : query.OrderBy(s => s.Customer != null ? s.Customer.CustomerName : string.Empty),
+                "TotalAmount" => criteria.SortDescending ? query.OrderByDescending(s => s.TotalAmount) : query.OrderBy(s => s.TotalAmount),
+                _ => query.OrderByDescending(s => s.SaleDate)
+            };
+        }
+
+        var items = await query
+            .Skip((criteria.Page - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .ToListAsync();
+
+        return new InventoryManagement.Application.DTOs.Criteria.PagedResult<Sale>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = criteria.Page,
+            PageSize = criteria.PageSize
+        };
     }
 }
 

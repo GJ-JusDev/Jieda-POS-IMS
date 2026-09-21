@@ -3,29 +3,121 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignHeight="600" d:DesignWidth="800">
-    <Grid>
-        <StackPanel Margin="20">
-            <TextBlock Text="System Settings &amp; Administration" FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
+             mc:Ignorable="d">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="20">
+            <StackPanel>
+                <TextBlock Text="System Settings &amp; Administration" Style="{StaticResource Heading1}" Margin="0,0,0,25"/>
 
-            <Border Background="#f8f9fa" Padding="20" BorderBrush="#dee2e6" BorderThickness="1" Margin="0,0,0,20">
-                <StackPanel>
-                    <TextBlock Text="Database Backup &amp; Restore" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                    <TextBlock Text="The system automatically creates a backup every time the application is closed. You can also manually create a backup or restore from a previous file." TextWrapping="Wrap" Margin="0,0,0,20"/>
-                    
-                    <StackPanel Orientation="Horizontal">
-                        <Button Content="Create Manual Backup" Command="{Binding ManualBackupCommand}" Padding="15,10" Margin="0,0,15,0" Background="#007bff" Foreground="White"/>
-                        <Button Content="Restore from Backup" Command="{Binding RestoreBackupCommand}" Padding="15,10" Background="#dc3545" Foreground="White"/>
+                <!-- Backup & Restore -->
+                <Border Style="{StaticResource CardStyle}" Margin="0,0,0,20">
+                    <StackPanel>
+                        <TextBlock Text="Database Backup &amp; Restore" Style="{StaticResource Heading3}" Margin="0,0,0,10"/>
+                        <TextBlock Text="The system automatically creates a backup once per calendar day. You can also manually create a backup or restore from a previous file. A pre-restore safety backup is created automatically before any restore operation." Foreground="{StaticResource TextSecondaryBrush}" FontSize="15" TextWrapping="Wrap" Margin="0,0,0,25"/>
+                        
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Create Manual Backup" Command="{Binding ManualBackupCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,15,0"/>
+                            <Button Content="Restore from Backup" Command="{Binding RestoreBackupCommand}" Style="{StaticResource DangerButton}" />
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
-            </Border>
-            
-            <Border Background="#f8f9fa" Padding="20" BorderBrush="#dee2e6" BorderThickness="1">
-                <StackPanel>
-                    <TextBlock Text="Note" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,10"/>
-                    <TextBlock Text="Automatic backups are stored in the 'Backups' folder next to your main database file. The system automatically deletes backups older than 7 days to save space." TextWrapping="Wrap"/>
-                </StackPanel>
-            </Border>
-        </StackPanel>
-    </Grid>
+                </Border>
+                
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Barcode Scanner Configuration -->
+                    <Border Grid.Column="0" Style="{StaticResource CardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="Barcode Scanner Configuration" Style="{StaticResource Heading3}" Margin="0,0,0,10"/>
+                            <TextBlock Text="Adjust timing and lengths for physical USB scanner devices." Foreground="{StaticResource TextSecondaryBrush}" FontSize="15" TextWrapping="Wrap" Margin="0,0,0,20"/>
+                            
+                            <Grid Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="250" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Minimum Barcode Length" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold"/>
+                                <TextBox Grid.Column="1" Text="{Binding MinBarcodeLength, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left" Padding="5"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,15">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="250" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Max Time Between Keystrokes" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Scanner input is normally much faster than human typing. Increase this value if your scanner is not being detected reliably." FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" Margin="0,2,10,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBox Text="{Binding MaxTimeBetweenKeystrokesMs, UpdateSourceTrigger=PropertyChanged}" Width="100" HorizontalAlignment="Left" Padding="5"/>
+                                    <TextBlock Text=" ms" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,25">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="250" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Require Terminating Enter" VerticalAlignment="Center" FontSize="14" FontWeight="SemiBold"/>
+                                <CheckBox Grid.Column="1" IsChecked="{Binding RequireTerminatingEnter}" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <Button Content="Save Barcode Settings" Command="{Binding SaveBarcodeSettingsCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0"/>
+                                <Button Content="Reset Defaults" Command="{Binding ResetBarcodeSettingsCommand}"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- System Diagnostics -->
+                    <Border Grid.Column="2" Style="{StaticResource CardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="System Diagnostics" Style="{StaticResource Heading3}" Margin="0,0,0,10"/>
+                            <TextBlock Text="Run a diagnostic check to verify environment compatibility." Foreground="{StaticResource TextSecondaryBrush}" FontSize="15" TextWrapping="Wrap" Margin="0,0,0,15"/>
+                            
+                            <Button Content="Run Diagnostics" Command="{Binding RunDiagnosticsCommand}" HorizontalAlignment="Left" Margin="0,0,0,20"/>
+                            
+                            <DataGrid ItemsSource="{Binding Diagnostics}" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" HorizontalGridLinesBrush="{StaticResource BorderBrush}" VerticalGridLinesBrush="Transparent" Background="Transparent" BorderThickness="1" BorderBrush="{StaticResource BorderBrush}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Check" Binding="{Binding Name}" Width="200"/>
+                                    <DataGridTextColumn Header="Result" Binding="{Binding Value}" Width="*"/>
+                                    <DataGridTemplateColumn Header="Status" Width="90">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="4" Padding="5,2" Margin="5" HorizontalAlignment="Center">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Status}" Value="PASS">
+                                                                    <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="WARNING">
+                                                                    <Setter Property="Background" Value="{StaticResource WarningBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Status}" Value="ERROR">
+                                                                    <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <TextBlock Text="{Binding Status}" Foreground="White" FontWeight="Bold" FontSize="11"/>
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
 </UserControl>

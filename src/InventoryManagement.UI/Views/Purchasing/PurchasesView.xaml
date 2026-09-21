@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignHeight="600" d:DesignWidth="800">
+             mc:Ignorable="d" d:DesignHeight="700" d:DesignWidth="1200">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -11,32 +11,77 @@
         </Grid.RowDefinitions>
         
         <!-- Toolbar -->
-        <Border Grid.Row="0" Background="#f8f9fa" Padding="10" BorderBrush="#dee2e6" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal">
-                <Button Content="Refresh" Command="{Binding LoadCommand}" Padding="15,5" Margin="0,0,10,0"/>
-                            <Button Content="Create Draft PO" Command="{Binding CreateDraftCommand}" Padding="15,5" Margin="0,0,10,0" Background="#007bff" Foreground="White"/>
-            <Button Content="Edit PO" Command="{Binding EditDraftCommand}" Padding="15,5" Margin="0,0,10,0"/>
-                                <Button Content="Complete PO (Stock In)" Command="{Binding CompletePurchaseCommand}" Padding="15,5" Margin="0,0,10,0" Background="#28a745" Foreground="White"/>
-                <Button Content="Delete PO" Command="{Binding DeletePurchaseCommand}" Padding="15,5" Background="#dc3545" Foreground="White"/>
-            </StackPanel>
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,20,10">
+                    <TextBlock Text="Search:" Style="{StaticResource Heading3}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBox Width="180" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <StackPanel Orientation="Horizontal" Margin="0,0,20,10">
+                    <TextBlock Text="From:" Style="{StaticResource Heading3}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <DatePicker SelectedDate="{Binding DateFrom}" Width="120" VerticalAlignment="Center"/>
+                </StackPanel>
+                
+                <StackPanel Orientation="Horizontal" Margin="0,0,20,10">
+                    <TextBlock Text="To:" Style="{StaticResource Heading3}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <DatePicker SelectedDate="{Binding DateTo}" Width="120" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
+                    <Button Content="Search" Command="{Binding LoadCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0"/>
+                    <Button Content="Create Draft PO" Command="{Binding CreateDraftCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0"/>
+                    <Button Content="Edit PO" Command="{Binding EditDraftCommand}" Margin="0,0,10,0"/>
+                    <Button Content="Complete PO (Stock In)" Command="{Binding CompletePurchaseCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,10,0"/>
+                    <Button Content="Delete PO" Command="{Binding DeletePurchaseCommand}" Style="{StaticResource DangerButton}"/>
+                </StackPanel>
+            </WrapPanel>
         </Border>
         
         <!-- DataGrid -->
-        <DataGrid Grid.Row="1" ItemsSource="{Binding Purchases}" SelectedItem="{Binding SelectedPurchase}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="Purchase No." Binding="{Binding PurchaseNumber}" Width="150"/>
-                <DataGridTextColumn Header="Date" Binding="{Binding PurchaseDate, StringFormat=d}" Width="100"/>
-                <DataGridTextColumn Header="Supplier" Binding="{Binding Supplier.SupplierName}" Width="*"/>
-                <DataGridTextColumn Header="Total Amount" Binding="{Binding TotalAmount, StringFormat=C}" Width="120"/>
-                <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="120">
-                    <DataGridTextColumn.ElementStyle>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="FontWeight" Value="Bold"/>
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
-            </DataGrid.Columns>
-        </DataGrid>
+        <Grid Grid.Row="1" Margin="20">
+            <DataGrid ItemsSource="{Binding Purchases}" SelectedItem="{Binding SelectedPurchase}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Purchase No." Binding="{Binding PurchaseNumber}" Width="160"/>
+                    <DataGridTextColumn Header="Date" Binding="{Binding PurchaseDate, StringFormat=d}" Width="120"/>
+                    <DataGridTextColumn Header="Supplier" Binding="{Binding Supplier.SupplierName}" Width="*"/>
+                    <DataGridTextColumn Header="Total Amount" Binding="{Binding TotalAmount, StringFormat=C}" Width="140"/>
+                    <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="140">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Status}" Value="Draft">
+                                        <Setter Property="Foreground" Value="{StaticResource WarningBrush}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Status}" Value="Completed">
+                                        <Setter Property="Foreground" Value="{StaticResource SuccessBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Text="{Binding EmptyMessage}" 
+                       HorizontalAlignment="Center" 
+                       VerticalAlignment="Center" 
+                       FontSize="18" 
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextMutedBrush}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding EmptyMessage}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
     </Grid>
 </UserControl>
 

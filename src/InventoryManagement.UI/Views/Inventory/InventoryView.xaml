@@ -12,33 +12,28 @@
         
         <!-- Toolbar / Search -->
         <Border Grid.Row="0" Background="#f8f9fa" Padding="10" BorderBrush="#dee2e6" BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,15,10">
+                    <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <TextBox Width="150" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Padding="5" VerticalAlignment="Center"/>
+                </StackPanel>
                 
-                <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Grid.Column="1" Width="150" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,15,0" Padding="5"/>
-                
-                <TextBlock Grid.Column="2" Text="Category:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <ComboBox Grid.Column="3" Width="120" HorizontalAlignment="Left" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedFilterCategory}" DisplayMemberPath="CategoryName" Margin="0,0,15,0" Padding="5"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,15,10">
+                    <TextBlock Text="Category:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <ComboBox Width="120" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedFilterCategory}" DisplayMemberPath="CategoryName" Padding="5" VerticalAlignment="Center"/>
+                </StackPanel>
 
-                <TextBlock Grid.Column="4" Text="Status:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <ComboBox Grid.Column="5" Width="120" HorizontalAlignment="Left" ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}" Margin="0,0,15,0" Padding="5"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,15,10">
+                    <TextBlock Text="Status:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                    <ComboBox Width="120" ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}" Padding="5" VerticalAlignment="Center"/>
+                </StackPanel>
                 
-                <StackPanel Grid.Column="7" Orientation="Horizontal">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
                     <Button Content="Search" Command="{Binding SearchCommand}" Padding="15,5" Margin="0,0,10,0"/>
                     <Button Content="Adjust Stock" Command="{Binding AdjustStockCommand}" Padding="15,5" Margin="0,0,10,0" Background="#17a2b8" Foreground="White"/>
                     <Button Content="History" Command="{Binding ViewHistoryCommand}" Padding="15,5" />
                 </StackPanel>
-            </Grid>
+            </WrapPanel>
         </Border>
         
         <!-- DataGrid -->

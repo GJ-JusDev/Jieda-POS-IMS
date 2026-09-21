@@ -25,15 +25,56 @@ public partial class MainWindow : Window
 {
     private readonly IAuthenticationService _authService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly InventoryManagement.Application.Interfaces.IBarcodeScannerService _scannerService;
 
-    public MainWindow(IAuthenticationService authService, IAuthorizationService authorizationService)
+    public MainWindow(IAuthenticationService authService, IAuthorizationService authorizationService, InventoryManagement.Application.Interfaces.IBarcodeScannerService scannerService)
     {
         InitializeComponent();
         Loaded += (s, e) => LoadDashboard();
         _authService = authService;
         _authorizationService = authorizationService;
+        _scannerService = scannerService;
         
         Loaded += MainWindow_Loaded;
+        PreviewTextInput += MainWindow_PreviewTextInput;
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
+        
+        _scannerService.BarcodeScanned += ScannerService_BarcodeScanned;
+    }
+
+    private void MainWindow_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+    {
+        _scannerService.ProcessInput(e.Text);
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter || e.Key == System.Windows.Input.Key.Return)
+        {
+            if (_scannerService.ProcessEnter(out string barcode))
+            {
+                e.Handled = true; // Prevent Enter on focused control
+                
+                // Erase barcode text that might have been typed into the focused control
+                if (System.Windows.Input.Keyboard.FocusedElement is System.Windows.Controls.TextBox txt)
+                {
+                    if (txt.Text.EndsWith(barcode))
+                    {
+                        txt.Text = txt.Text.Substring(0, txt.Text.Length - barcode.Length);
+                        txt.CaretIndex = txt.Text.Length;
+                    }
+                }
+            }
+        }
+    }
+
+    private void ScannerService_BarcodeScanned(object? sender, string barcode)
+    {
+        // Route to the active view model if it supports barcode scanning
+        if (MainContent.Content is FrameworkElement element && element.DataContext is InventoryManagement.Application.Interfaces.IBarcodeScannerTarget target)
+        {
+            target.OnBarcodeScanned(barcode);
+        }
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)

@@ -11,7 +11,7 @@ using InventoryManagement.UI.ViewModels.Base;
 
 namespace InventoryManagement.UI.ViewModels.Purchasing;
 
-public class PurchaseEditorViewModel : ViewModelBase
+public class PurchaseEditorViewModel : ViewModelBase, InventoryManagement.Application.Interfaces.IBarcodeScannerTarget
 {
     private readonly IPurchaseService _purchaseService;
     private readonly ISupplierService _supplierService;
@@ -211,5 +211,46 @@ public class PurchaseEditorViewModel : ViewModelBase
         }
         
         CloseAction?.Invoke();
+    }
+
+    public async void OnBarcodeScanned(string barcode)
+    {
+        if (string.IsNullOrWhiteSpace(barcode)) return;
+
+        try
+        {
+            var product = await _productService.GetByBarcodeAsync(barcode);
+
+            if (product != null)
+            {
+                if (!product.IsActive)
+                {
+                    MessageBox.Show("Product is inactive", "Inactive", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                SelectedProduct = product;
+                UnitCost = product.CostPrice;
+                Quantity = 1;
+
+                var existingItem = PurchaseItems.FirstOrDefault(i => i.ProductId == product.ProductId);
+                if (existingItem != null)
+                {
+                    // Increase quantity of existing line
+                    Quantity = existingItem.Quantity + 1;
+                    await _purchaseService.RemovePurchaseItemAsync(existingItem.PurchaseItemId);
+                }
+
+                await AddItemAsync();
+            }
+            else
+            {
+                MessageBox.Show("Product not found", "Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error processing barcode: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 }

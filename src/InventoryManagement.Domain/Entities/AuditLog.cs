@@ -8,4 +8,6 @@ public class AuditLog {
     public string RecordId { get; set; } = string.Empty;
     public string? Description { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public User? User { get; set; }
 }

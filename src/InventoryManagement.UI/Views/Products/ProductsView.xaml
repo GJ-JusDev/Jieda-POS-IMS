@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignHeight="600" d:DesignWidth="800">
+             mc:Ignorable="d" d:DesignHeight="700" d:DesignWidth="1000">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -11,45 +11,67 @@
         </Grid.RowDefinitions>
         
         <!-- Toolbar / Search -->
-        <Border Grid.Row="0" Background="#f8f9fa" Padding="10" BorderBrush="#dee2e6" BorderThickness="0,0,0,1">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                
-                <TextBlock Text="Search:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <TextBox Grid.Column="1" Width="200" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,15,0" Padding="5"/>
-                
-                <TextBlock Grid.Column="2" Text="Category:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-                <ComboBox Grid.Column="3" Width="150" HorizontalAlignment="Left" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedFilterCategory}" DisplayMemberPath="CategoryName" Margin="0,0,15,0" Padding="5"/>
-                
-                <StackPanel Grid.Column="4" Orientation="Horizontal">
-                    <Button Content="Search" Command="{Binding SearchCommand}" Padding="15,5" Margin="0,0,10,0"/>
-                    <Button Content="Add Product" Command="{Binding AddCommand}" Padding="15,5" Margin="0,0,10,0" Background="#28a745" Foreground="White"/>
-                    <Button Content="Edit" Command="{Binding EditCommand}" Padding="15,5" Margin="0,0,10,0"/>
-                                        <Button Content="Deactivate" Command="{Binding DeactivateCommand}" Padding="15,5" Background="#dc3545" Foreground="White" Margin="0,0,10,0"/>
-                    <Button Content="Export Barcodes" Command="{Binding ExportBarcodesCommand}" Padding="15,5" Background="#17a2b8" Foreground="White"/>
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <WrapPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,20,10">
+                    <TextBlock Text="Search:" Style="{StaticResource Heading3}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBox Width="220" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" />
                 </StackPanel>
-            </Grid>
+                
+                <StackPanel Orientation="Horizontal" Margin="0,0,20,10">
+                    <TextBlock Text="Category:" Style="{StaticResource Heading3}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <ComboBox Width="180" ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedFilterCategory}" DisplayMemberPath="CategoryName" VerticalAlignment="Center" />
+                </StackPanel>
+                
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,10" VerticalAlignment="Center">
+                    <Button Content="Search" Command="{Binding SearchCommand}" Style="{StaticResource PrimaryButton}" Margin="0,0,10,0"/>
+                    <Button Content="Add Product" Command="{Binding AddCommand}" Style="{StaticResource SuccessButton}" Margin="0,0,10,0"/>
+                    <Button Content="Edit" Command="{Binding EditCommand}" Margin="0,0,10,0"/>
+                    <Button Content="Deactivate" Command="{Binding DeactivateCommand}" Style="{StaticResource DangerButton}" Margin="0,0,10,0"/>
+                    <Button Content="Export Barcodes" Command="{Binding ExportBarcodesCommand}" />
+                </StackPanel>
+            </WrapPanel>
         </Border>
         
-        <!-- DataGrid -->
-        <DataGrid Grid.Row="1" ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10">
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="SKU" Binding="{Binding SKU}" Width="100"/>
-                <DataGridTextColumn Header="Barcode" Binding="{Binding Barcode}" Width="120"/>
-                <DataGridTextColumn Header="Product Name" Binding="{Binding ProductName}" Width="*"/>
-                <DataGridTextColumn Header="Category" Binding="{Binding Category.CategoryName}" Width="150"/>
-                <DataGridTextColumn Header="Unit" Binding="{Binding Unit.Symbol}" Width="80"/>
-                <DataGridTextColumn Header="Cost Price" Binding="{Binding CostPrice, StringFormat=C}" Width="100"/>
-                <DataGridTextColumn Header="Selling Price" Binding="{Binding SellingPrice, StringFormat=C}" Width="100"/>
-                <DataGridTextColumn Header="Reorder Level" Binding="{Binding ReorderLevel}" Width="100"/>
-            </DataGrid.Columns>
-        </DataGrid>
+        <!-- DataGrid and Empty Message -->
+        <Grid Grid.Row="1" Margin="20">
+            <DataGrid ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="SKU" Binding="{Binding SKU}" Width="120"/>
+                    <DataGridTextColumn Header="Barcode" Binding="{Binding Barcode}" Width="140"/>
+                    <DataGridTextColumn Header="Product Name" Binding="{Binding ProductName}" Width="*">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="Category" Binding="{Binding Category.CategoryName}" Width="160"/>
+                    <DataGridTextColumn Header="Unit" Binding="{Binding Unit.Symbol}" Width="100"/>
+                    <DataGridTextColumn Header="Cost Price" Binding="{Binding CostPrice, StringFormat=C}" Width="120"/>
+                    <DataGridTextColumn Header="Selling Price" Binding="{Binding SellingPrice, StringFormat=C}" Width="120"/>
+                    <DataGridTextColumn Header="Reorder" Binding="{Binding ReorderLevel}" Width="100"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            
+            <TextBlock Text="{Binding EmptyMessage}" 
+                       HorizontalAlignment="Center" 
+                       VerticalAlignment="Center" 
+                       FontSize="18" 
+                       FontWeight="SemiBold"
+                       Foreground="{StaticResource TextMutedBrush}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding EmptyMessage}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Grid>
     </Grid>
 </UserControl>
 

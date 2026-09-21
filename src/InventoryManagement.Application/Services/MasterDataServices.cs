@@ -11,10 +11,14 @@ namespace InventoryManagement.Application.Services;
 public abstract class BaseMasterDataService<T> : IMasterDataService<T> where T : class
 {
     protected readonly IInventoryDbContext _context;
-    
-    protected BaseMasterDataService(IInventoryDbContext context)
+    protected readonly IAuditLogService _auditLogService;
+    protected readonly IAuthenticationService _authService;
+
+    protected BaseMasterDataService(IInventoryDbContext context, IAuditLogService auditLogService, IAuthenticationService authService)
     {
         _context = context;
+        _auditLogService = auditLogService;
+        _authService = authService;
     }
 
     public virtual async Task<IEnumerable<T>> GetAllAsync()
@@ -29,13 +33,31 @@ public abstract class BaseMasterDataService<T> : IMasterDataService<T> where T :
 
     public virtual async Task<T> AddAsync(T entity)
     {
-        // Reflection check for CreatedAt if applicable
         var createdAtProp = typeof(T).GetProperty("CreatedAt");
         if (createdAtProp != null && createdAtProp.CanWrite)
             createdAtProp.SetValue(entity, DateTime.UtcNow);
 
         _context.Set<T>().Add(entity);
+        
+        // Save first to generate ID
         await _context.SaveChangesAsync();
+
+        var idProp = typeof(T).GetProperty(typeof(T).Name + "Id");
+        var id = idProp?.GetValue(entity)?.ToString() ?? "";
+        
+        int userId = _authService.CurrentUser?.UserId ?? 0;
+        
+        _context.AuditLogs.Add(new AuditLog
+        {
+            UserId = userId,
+            Action = $"{typeof(T).Name}Created",
+            TableName = typeof(T).Name,
+            RecordId = id,
+            Description = $"Created {typeof(T).Name}"
+        });
+        
+        await _context.SaveChangesAsync();
+
         return entity;
     }
 
@@ -46,6 +68,21 @@ public abstract class BaseMasterDataService<T> : IMasterDataService<T> where T :
             updatedAtProp.SetValue(entity, DateTime.UtcNow);
 
         _context.Set<T>().Update(entity);
+        
+        var idProp = typeof(T).GetProperty(typeof(T).Name + "Id");
+        var id = idProp?.GetValue(entity)?.ToString() ?? "";
+        
+        int userId = _authService.CurrentUser?.UserId ?? 0;
+        
+        _context.AuditLogs.Add(new AuditLog
+        {
+            UserId = userId,
+            Action = $"{typeof(T).Name}Updated",
+            TableName = typeof(T).Name,
+            RecordId = id,
+            Description = $"Updated {typeof(T).Name}"
+        });
+        
         await _context.SaveChangesAsync();
     }
 
@@ -58,7 +95,25 @@ public abstract class BaseMasterDataService<T> : IMasterDataService<T> where T :
             if (isActiveProp != null && isActiveProp.CanWrite)
             {
                 isActiveProp.SetValue(entity, false);
-                await UpdateAsync(entity);
+                
+                var updatedAtProp = typeof(T).GetProperty("UpdatedAt");
+                if (updatedAtProp != null && updatedAtProp.CanWrite)
+                    updatedAtProp.SetValue(entity, DateTime.UtcNow);
+
+                _context.Set<T>().Update(entity);
+                
+                int userId = _authService.CurrentUser?.UserId ?? 0;
+                
+                _context.AuditLogs.Add(new AuditLog
+                {
+                    UserId = userId,
+                    Action = $"{typeof(T).Name}Deactivated",
+                    TableName = typeof(T).Name,
+                    RecordId = id.ToString(),
+                    Description = $"Deactivated {typeof(T).Name}"
+                });
+                
+                await _context.SaveChangesAsync();
             }
         }
     }
@@ -66,7 +121,7 @@ public abstract class BaseMasterDataService<T> : IMasterDataService<T> where T :
 
 public class CategoryService : BaseMasterDataService<Category>, ICategoryService
 {
-    public CategoryService(IInventoryDbContext context) : base(context) { }
+    public CategoryService(IInventoryDbContext context, IAuditLogService auditLogService, IAuthenticationService authService) : base(context, auditLogService, authService) { }
     
     public override async Task<IEnumerable<Category>> GetAllAsync()
     {
@@ -76,7 +131,7 @@ public class CategoryService : BaseMasterDataService<Category>, ICategoryService
 
 public class UnitService : BaseMasterDataService<Unit>, IUnitService
 {
-    public UnitService(IInventoryDbContext context) : base(context) { }
+    public UnitService(IInventoryDbContext context, IAuditLogService auditLogService, IAuthenticationService authService) : base(context, auditLogService, authService) { }
     
     public override async Task<IEnumerable<Unit>> GetAllAsync()
     {
@@ -86,7 +141,7 @@ public class UnitService : BaseMasterDataService<Unit>, IUnitService
 
 public class SupplierService : BaseMasterDataService<Supplier>, ISupplierService
 {
-    public SupplierService(IInventoryDbContext context) : base(context) { }
+    public SupplierService(IInventoryDbContext context, IAuditLogService auditLogService, IAuthenticationService authService) : base(context, auditLogService, authService) { }
     
     public override async Task<IEnumerable<Supplier>> GetAllAsync()
     {
@@ -96,7 +151,7 @@ public class SupplierService : BaseMasterDataService<Supplier>, ISupplierService
 
 public class CustomerService : BaseMasterDataService<Customer>, ICustomerService
 {
-    public CustomerService(IInventoryDbContext context) : base(context) { }
+    public CustomerService(IInventoryDbContext context, IAuditLogService auditLogService, IAuthenticationService authService) : base(context, auditLogService, authService) { }
     
     public override async Task<IEnumerable<Customer>> GetAllAsync()
     {
@@ -106,7 +161,7 @@ public class CustomerService : BaseMasterDataService<Customer>, ICustomerService
 
 public class ProductService : BaseMasterDataService<Product>, IProductService
 {
-    public ProductService(IInventoryDbContext context) : base(context) { }
+    public ProductService(IInventoryDbContext context, IAuditLogService auditLogService, IAuthenticationService authService) : base(context, auditLogService, authService) { }
 
     public override async Task<IEnumerable<Product>> GetAllAsync()
     {
@@ -161,6 +216,67 @@ public class ProductService : BaseMasterDataService<Product>, IProductService
         }
 
         return await query.ToListAsync();
+    }
+    public async Task<InventoryManagement.Application.DTOs.Criteria.PagedResult<Product>> SearchProductsAsync(InventoryManagement.Application.DTOs.Criteria.ProductSearchCriteria criteria)
+    {
+        var query = _context.Products
+            .Include(p => p.Category)
+            .Include(p => p.Unit)
+            .AsQueryable();
+
+        if (criteria.IsActive.HasValue)
+        {
+            query = query.Where(p => p.IsActive == criteria.IsActive.Value);
+        }
+
+        if (criteria.CategoryId.HasValue && criteria.CategoryId.Value > 0)
+        {
+            query = query.Where(p => p.CategoryId == criteria.CategoryId.Value);
+        }
+
+        if (criteria.UnitId.HasValue && criteria.UnitId.Value > 0)
+        {
+            query = query.Where(p => p.UnitId == criteria.UnitId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(criteria.SearchText))
+        {
+            var text = criteria.SearchText.Trim(); // Let SQLite handle case insensitivity via LIKE
+            query = query.Where(p => p.ProductName.Contains(text) || 
+                                     p.SKU.Contains(text) || 
+                                     (p.Barcode != null && p.Barcode.Contains(text)));
+        }
+
+        var totalCount = await query.CountAsync();
+
+        if (string.IsNullOrEmpty(criteria.SortColumn))
+        {
+            query = query.OrderBy(p => p.ProductName);
+        }
+        else
+        {
+            query = criteria.SortColumn switch
+            {
+                "ProductName" => criteria.SortDescending ? query.OrderByDescending(p => p.ProductName) : query.OrderBy(p => p.ProductName),
+                "SKU" => criteria.SortDescending ? query.OrderByDescending(p => p.SKU) : query.OrderBy(p => p.SKU),
+                "Category" => criteria.SortDescending ? query.OrderByDescending(p => p.Category != null ? p.Category.CategoryName : "") : query.OrderBy(p => p.Category != null ? p.Category.CategoryName : ""),
+                "Price" => criteria.SortDescending ? query.OrderByDescending(p => p.SellingPrice) : query.OrderBy(p => p.SellingPrice),
+                _ => query.OrderBy(p => p.ProductName)
+            };
+        }
+
+        var items = await query
+            .Skip((criteria.Page - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .ToListAsync();
+
+        return new InventoryManagement.Application.DTOs.Criteria.PagedResult<Product>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = criteria.Page,
+            PageSize = criteria.PageSize
+        };
     }
     
     public override async Task<Product> AddAsync(Product entity)

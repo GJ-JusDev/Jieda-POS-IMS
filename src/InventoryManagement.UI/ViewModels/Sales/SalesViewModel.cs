@@ -8,6 +8,7 @@ using InventoryManagement.Application.Interfaces;
 using InventoryManagement.Domain.Entities;
 using InventoryManagement.UI.ViewModels.Base;
 using InventoryManagement.Domain.Enums;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InventoryManagement.UI.ViewModels.Sales;
 
@@ -61,7 +62,7 @@ public class SaleItemModel : ViewModelBase
     public decimal TotalPrice => (Quantity * UnitPrice) - Discount;
 }
 
-public class SalesViewModel : ViewModelBase
+public class SalesViewModel : ViewModelBase, InventoryManagement.Application.Interfaces.IBarcodeScannerTarget
 {
     private readonly ISaleService _saleService;
     private readonly IProductService _productService;
@@ -69,6 +70,14 @@ public class SalesViewModel : ViewModelBase
     private readonly IAuthenticationService _authService;
 
     public ObservableCollection<SaleItemModel> CartItems { get; set; } = new();
+    public ObservableCollection<Product> AvailableProducts { get; set; } = new();
+
+    private Product? _selectedProduct;
+    public Product? SelectedProduct
+    {
+        get => _selectedProduct;
+        set => SetProperty(ref _selectedProduct, value);
+    }
 
     private string _barcodeInput = string.Empty;
     public string BarcodeInput
@@ -85,6 +94,7 @@ public class SalesViewModel : ViewModelBase
     }
     
     public ICommand ScanBarcodeCommand { get; }
+    public ICommand AddSelectedProductCommand { get; }
     public ICommand RemoveItemCommand { get; }
     public ICommand CheckoutCommand { get; }
 
@@ -96,10 +106,35 @@ public class SalesViewModel : ViewModelBase
         _authService = authService;
 
         ScanBarcodeCommand = new RelayCommand(async _ => await ProcessBarcodeAsync());
+        AddSelectedProductCommand = new RelayCommand(async _ => await AddSelectedProductAsync(), _ => SelectedProduct != null);
         RemoveItemCommand = new RelayCommand<SaleItemModel>(RemoveItem);
         CheckoutCommand = new RelayCommand(async _ => await CheckoutAsync(), _ => CartItems.Any());
         
         CartItems.CollectionChanged += (s, e) => UpdateTotal();
+        
+        _ = LoadProductsAsync();
+    }
+
+    private async Task LoadProductsAsync()
+    {
+        try
+        {
+            var products = await _productService.GetAllAsync();
+            foreach (var p in products.Where(x => x.IsActive))
+            {
+                AvailableProducts.Add(p);
+            }
+        }
+        catch
+        {
+            // Ignore UI-level loading errors for dropdown; fallback to barcode scanner
+        }
+    }
+
+    public async void OnBarcodeScanned(string barcode)
+    {
+        BarcodeInput = barcode;
+        await ProcessBarcodeAsync();
     }
 
     private async Task ProcessBarcodeAsync()
@@ -108,41 +143,14 @@ public class SalesViewModel : ViewModelBase
 
         try
         {
-            // First try barcode, then fallback to SKU
             var product = await _productService.GetByBarcodeAsync(BarcodeInput);
-            if (product == null)
-            {
-                product = await _productService.GetBySkuAsync(BarcodeInput);
-            }
-
             if (product != null)
             {
-                var existingItem = CartItems.FirstOrDefault(i => i.ProductId == product.ProductId);
-                if (existingItem != null)
-                {
-                    existingItem.Quantity++;
-                    UpdateTotal();
-                }
-                else
-                {
-                    var newItem = new SaleItemModel
-                    {
-                        ProductId = product.ProductId,
-                        ProductName = product.ProductName,
-                        Quantity = 1,
-                        UnitPrice = product.SellingPrice,
-                        Discount = 0
-                    };
-                    
-                    // Attach property changed handler to update total when qty changes
-                    newItem.PropertyChanged += (s, e) => { if (e.PropertyName == nameof(SaleItemModel.TotalPrice)) UpdateTotal(); };
-                    
-                    CartItems.Add(newItem);
-                }
+                await AddProductToCartAsync(product);
             }
             else
             {
-                MessageBox.Show("Product not found.", "Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("Product not found", "Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
         catch (Exception ex)
@@ -152,6 +160,66 @@ public class SalesViewModel : ViewModelBase
         finally
         {
             BarcodeInput = string.Empty; // Clear for next scan
+        }
+    }
+
+    private async Task AddSelectedProductAsync()
+    {
+        if (SelectedProduct == null) return;
+        try
+        {
+            await AddProductToCartAsync(SelectedProduct);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Error adding product: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            SelectedProduct = null;
+        }
+    }
+
+    private async Task AddProductToCartAsync(Product product)
+    {
+        if (!product.IsActive)
+        {
+            MessageBox.Show("Product is inactive", "Inactive", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var existingItem = CartItems.FirstOrDefault(i => i.ProductId == product.ProductId);
+        
+        // Optional UI-level stock check (Business logic still enforces this in Checkout)
+        var currentStock = await ((App)System.Windows.Application.Current).Services.GetRequiredService<IInventoryService>().GetCurrentStockAsync(product.ProductId);
+        var desiredQty = (existingItem?.Quantity ?? 0) + 1;
+        
+        if (currentStock < desiredQty)
+        {
+            MessageBox.Show($"Insufficient stock for '{product.ProductName}'. Available: {currentStock}", "Stock Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (existingItem != null)
+        {
+            existingItem.Quantity++;
+            UpdateTotal();
+        }
+        else
+        {
+            var newItem = new SaleItemModel
+            {
+                ProductId = product.ProductId,
+                ProductName = product.ProductName,
+                Quantity = 1,
+                UnitPrice = product.SellingPrice,
+                Discount = 0
+            };
+            
+            // Attach property changed handler to update total when qty changes
+            newItem.PropertyChanged += (s, e) => { if (e.PropertyName == nameof(SaleItemModel.TotalPrice)) UpdateTotal(); };
+            
+            CartItems.Add(newItem);
         }
     }
 

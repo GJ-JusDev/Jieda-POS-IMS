@@ -3,36 +3,70 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignHeight="600" d:DesignWidth="800">
+             mc:Ignorable="d" d:DesignHeight="700" d:DesignWidth="1000">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         
-        <Border Grid.Row="0" Background="#f8f9fa" Padding="10" BorderBrush="#dee2e6" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock Text="System Audit Logs (Last 100 entries)" VerticalAlignment="Center" FontSize="16" FontWeight="SemiBold" Margin="0,0,20,0"/>
-                <Button Content="Refresh" Command="{Binding RefreshCommand}" Padding="15,5" Background="#007bff" Foreground="White"/>
+        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" Padding="20" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <StackPanel>
+                <TextBlock Text="System Audit Logs" Style="{StaticResource Heading2}" Margin="0,0,0,20"/>
+                <WrapPanel Orientation="Horizontal">
+                    <StackPanel Margin="0,0,20,10">
+                        <TextBlock Text="Start Date:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                        <DatePicker SelectedDate="{Binding StartDate}" Width="140" Padding="5"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,20,10">
+                        <TextBlock Text="End Date:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                        <DatePicker SelectedDate="{Binding EndDate}" Width="140" Padding="5"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,20,10">
+                        <TextBlock Text="Action:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                        <TextBox Text="{Binding ActionFilter, UpdateSourceTrigger=PropertyChanged}" Width="160"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,20,10">
+                        <TextBlock Text="Module/Table:" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                        <TextBox Text="{Binding ModuleFilter, UpdateSourceTrigger=PropertyChanged}" Width="160"/>
+                    </StackPanel>
+                    <Button Content="Search" Command="{Binding RefreshCommand}" Style="{StaticResource PrimaryButton}" Margin="0,21,0,10"/>
+                </WrapPanel>
             </StackPanel>
         </Border>
         
-        <DataGrid Grid.Row="1" ItemsSource="{Binding Logs}" AutoGenerateColumns="False" IsReadOnly="True" Margin="10">
+        <DataGrid Grid.Row="1" ItemsSource="{Binding Logs}" Margin="20">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Timestamp" Binding="{Binding Timestamp, StringFormat=g}" Width="150"/>
-                <DataGridTextColumn Header="User ID" Binding="{Binding UserId}" Width="80"/>
-                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="150"/>
-                <DataGridTextColumn Header="Table" Binding="{Binding TableName}" Width="120"/>
+                <DataGridTextColumn Header="Timestamp" Binding="{Binding CreatedAt, StringFormat={}{0:g}}" Width="160"/>
+                <DataGridTextColumn Header="User" Binding="{Binding User.Username}" Width="120">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontWeight" Value="SemiBold"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="180"/>
+                <DataGridTextColumn Header="Module" Binding="{Binding TableName}" Width="130"/>
                 <DataGridTextColumn Header="Record ID" Binding="{Binding RecordId}" Width="100"/>
-                <DataGridTextColumn Header="Description" Binding="{Binding Description}" Width="*">
+                <DataGridTextColumn Header="Details" Binding="{Binding Description}" Width="*">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
                             <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
+
+        <Border Grid.Row="2" Background="{StaticResource HeaderBgBrush}" Padding="15" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Content="Previous Page" Command="{Binding PrevPageCommand}" Margin="0,0,15,0"/>
+                <TextBlock Text="{Binding CurrentPage, StringFormat=Page {0}}" VerticalAlignment="Center" FontWeight="Bold" FontSize="15" Margin="0,0,15,0"/>
+                <Button Content="Next Page" Command="{Binding NextPageCommand}" />
+            </StackPanel>
+        </Border>
     </Grid>
 </UserControl>
 

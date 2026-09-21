@@ -13,13 +13,5 @@ public class StockOverviewDto
     public decimal SellingPrice { get; set; }
     public decimal ReorderLevel { get; set; }
     
-    public string StockStatus 
-    {
-        get 
-        {
-            if (CurrentStock <= 0) return "Out of Stock";
-            if (CurrentStock <= ReorderLevel) return "Low Stock";
-            return "In Stock";
-        }
-    }
+    public string StockStatus { get; set; } = string.Empty;
 }

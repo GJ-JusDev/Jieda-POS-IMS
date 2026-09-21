@@ -79,13 +79,38 @@ public class ProductsViewModel : ViewModelBase
         await LoadProductsAsync();
     }
 
+    private string _emptyMessage = string.Empty;
+    public string EmptyMessage
+    {
+        get => _emptyMessage;
+        set { SetProperty(ref _emptyMessage, value); }
+    }
+
     private async Task LoadProductsAsync()
     {
-        var result = await _productService.SearchAsync(SearchText, SelectedFilterCategory?.CategoryId, null);
+        var criteria = new InventoryManagement.Application.DTOs.Criteria.ProductSearchCriteria
+        {
+            SearchText = SearchText,
+            CategoryId = SelectedFilterCategory?.CategoryId,
+            IsActive = true,
+            Page = 1,
+            PageSize = 1000 // Large page size to preserve existing UI without pagination
+        };
+
+        var result = await _productService.SearchProductsAsync(criteria);
         Products.Clear();
-        foreach (var p in result)
+        foreach (var p in result.Items)
         {
             Products.Add(p);
+        }
+
+        if (!Products.Any())
+        {
+            EmptyMessage = "No products found.";
+        }
+        else
+        {
+            EmptyMessage = string.Empty;
         }
     }
 

@@ -8,10 +8,11 @@ using InventoryManagement.Application.Interfaces;
 using InventoryManagement.Application.DTOs;
 using InventoryManagement.Domain.Entities;
 using InventoryManagement.UI.ViewModels.Base;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace InventoryManagement.UI.ViewModels.Inventory;
 
-public class InventoryViewModel : ViewModelBase
+public class InventoryViewModel : ViewModelBase, InventoryManagement.Application.Interfaces.IBarcodeScannerTarget
 {
     private readonly IInventoryService _inventoryService;
     private readonly ICategoryService _categoryService;
@@ -71,13 +72,38 @@ public class InventoryViewModel : ViewModelBase
         await LoadInventoryAsync();
     }
 
+    private string _emptyMessage = string.Empty;
+    public string EmptyMessage
+    {
+        get => _emptyMessage;
+        set { SetProperty(ref _emptyMessage, value); }
+    }
+
     private async Task LoadInventoryAsync()
     {
-        var result = await _inventoryService.GetStockOverviewAsync(SearchText, SelectedFilterCategory?.CategoryId, SelectedStatusFilter);
+        var criteria = new InventoryManagement.Application.DTOs.Criteria.InventorySearchCriteria
+        {
+            SearchText = SearchText,
+            CategoryId = SelectedFilterCategory?.CategoryId,
+            StockStatus = SelectedStatusFilter,
+            Page = 1,
+            PageSize = 1000
+        };
+
+        var result = await _inventoryService.SearchInventoryAsync(criteria);
         StockItems.Clear();
-        foreach (var item in result)
+        foreach (var item in result.Items)
         {
             StockItems.Add(item);
+        }
+
+        if (!StockItems.Any())
+        {
+            EmptyMessage = "No inventory records found.";
+        }
+        else
+        {
+            EmptyMessage = string.Empty;
         }
     }
 
@@ -85,30 +111,42 @@ public class InventoryViewModel : ViewModelBase
     {
         if (SelectedStockItem == null || _authService.CurrentUser == null) return;
         
-        // normally we would show a dialog with quantity and reason, simulating it for Phase 4:
-        var quantityToAdjust = 5m; // simulating adding 5 items
-        var reason = "Physical count correction";
+        var window = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.Views.Inventory.StockAdjustmentWindow>();
+        var vm = (InventoryManagement.UI.ViewModels.Inventory.StockAdjustmentViewModel)window.DataContext;
+        await vm.LoadProductAsync(SelectedStockItem.ProductId);
         
-        var result = MessageBox.Show($"Adjust stock for {SelectedStockItem.ProductName} by +{quantityToAdjust}?\nReason: {reason}", "Stock Adjustment", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        var result = window.ShowDialog();
         
-        if (result == MessageBoxResult.Yes)
+        if (result == true)
         {
-            try
-            {
-                await _inventoryService.AddStockAdjustmentAsync(SelectedStockItem.ProductId, quantityToAdjust, reason, _authService.CurrentUser.UserId);
-                await LoadInventoryAsync();
-                MessageBox.Show("Stock adjusted successfully.");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error adjusting stock: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            await LoadInventoryAsync();
         }
     }
 
-    private void ViewHistory()
+    private async void ViewHistory()
     {
         if (SelectedStockItem == null) return;
-        MessageBox.Show($"View History Dialog Placeholder for {SelectedStockItem.ProductName}");
+        
+        var window = ((App)System.Windows.Application.Current).Services.GetRequiredService<InventoryManagement.UI.Views.Inventory.StockHistoryWindow>();
+        var vm = (InventoryManagement.UI.ViewModels.Inventory.StockHistoryViewModel)window.DataContext;
+        await vm.LoadHistoryAsync(SelectedStockItem.ProductId);
+        
+        window.ShowDialog();
+    }
+
+    public async void OnBarcodeScanned(string barcode)
+    {
+        if (string.IsNullOrWhiteSpace(barcode)) return;
+        
+        SearchText = barcode;
+        SelectedFilterCategory = null;
+        SelectedStatusFilter = "All";
+        await LoadInventoryAsync();
+
+        // Optional: Pre-select if exactly one match
+        if (StockItems.Count == 1)
+        {
+            SelectedStockItem = StockItems[0];
+        }
     }
 }

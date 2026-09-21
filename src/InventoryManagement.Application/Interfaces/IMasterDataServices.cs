@@ -22,4 +22,5 @@ public interface IProductService : IMasterDataService<Product>
     Task<Product?> GetBySkuAsync(string sku);
     Task<Product?> GetByBarcodeAsync(string barcode);
     Task<IEnumerable<Product>> SearchAsync(string searchTerm, int? categoryId, int? unitId);
+    Task<InventoryManagement.Application.DTOs.Criteria.PagedResult<Product>> SearchProductsAsync(InventoryManagement.Application.DTOs.Criteria.ProductSearchCriteria criteria);
 }

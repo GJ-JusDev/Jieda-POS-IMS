@@ -10,6 +10,7 @@ using InventoryManagement.Infrastructure.Data;
 using InventoryManagement.Application.Interfaces;
 using InventoryManagement.Application.Services;
 using InventoryManagement.Infrastructure.Services;
+using InventoryManagement.Infrastructure.Logging;
 using InventoryManagement.UI.Views.Login;
 using InventoryManagement.UI.ViewModels.Products;
 using InventoryManagement.UI.ViewModels.Inventory;
@@ -21,7 +22,6 @@ using InventoryManagement.UI.ViewModels.Settings;
 using InventoryManagement.UI.Views.AuditLogs;
 using InventoryManagement.UI.ViewModels.AuditLogs;
 using InventoryManagement.UI.Views.Dashboard;
-using InventoryManagement.UI.ViewModels.Purchasing;
 using InventoryManagement.UI.Views.Purchasing;
 using InventoryManagement.UI.ViewModels.Dashboard;
 
@@ -30,25 +30,32 @@ namespace InventoryManagement.UI;
 public partial class App : System.Windows.Application
 {
     private readonly IHost _host;
+    private static ITechnicalLogger? _logger;
     public IServiceProvider Services => _host.Services;
 
     public App()
     {
-        // Global Exception Handling
+        var logDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "InventoryManagement", "Logs");
+        _logger = new TechnicalLogger(logDir);
+        _logger.LogInfo("Application starting");
+
         DispatcherUnhandledException += (s, e) =>
         {
+            _logger?.LogError("Unhandled UI Exception", e.Exception);
             MessageBox.Show($"An unexpected error occurred:\n{e.Exception.Message}", "System Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            e.Handled = true; // Prevent app crash
+            e.Handled = true; 
         };
 
         AppDomain.CurrentDomain.UnhandledException += (s, e) =>
         {
             var exception = e.ExceptionObject as Exception;
+            _logger?.LogError("Fatal Error", exception);
             MessageBox.Show($"A fatal error occurred:\n{exception?.Message}", "Fatal Error", MessageBoxButton.OK, MessageBoxImage.Error);
         };
 
         System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (s, e) =>
         {
+            _logger?.LogError("Unobserved Task Error", e.Exception);
             MessageBox.Show($"An unobserved task error occurred:\n{e.Exception.Message}", "Task Error", MessageBoxButton.OK, MessageBoxImage.Error);
             e.SetObserved();
         };
@@ -61,6 +68,8 @@ public partial class App : System.Windows.Application
             })
             .ConfigureServices((context, services) =>
             {
+                services.AddSingleton<ITechnicalLogger>(_logger!);
+                
                 var connectionString = context.Configuration.GetConnectionString("DefaultConnection");
                 services.AddDbContext<InventoryDbContext>(options => options.UseSqlite(connectionString));
                 services.AddTransient<IInventoryDbContext>(provider => provider.GetRequiredService<InventoryDbContext>());
@@ -69,16 +78,28 @@ public partial class App : System.Windows.Application
                 services.AddSingleton<IAuthorizationService, AuthorizationService>();
                 services.AddTransient<ICategoryService, CategoryService>();
                 services.AddTransient<IUnitService, UnitService>();
-                services.AddTransient<IProductService, ProductService>();
                 services.AddTransient<ISupplierService, SupplierService>();
                 services.AddTransient<ICustomerService, CustomerService>();
+                services.AddTransient<IProductService, ProductService>();
+                services.AddTransient<ISaleService, SaleService>();
                 services.AddTransient<IInventoryService, InventoryService>();
                 services.AddTransient<IPurchaseService, PurchaseService>();
-                services.AddTransient<ISaleService, SaleService>();
-                services.AddTransient<IReturnService, ReturnService>();
                 services.AddTransient<IReportService, ReportService>();
+                services.AddTransient<IReturnService, ReturnService>();
                 services.AddTransient<IBackupService, BackupService>();
                 services.AddTransient<IAuditLogService, AuditLogService>();
+                services.AddTransient<ISystemDiagnosticsService, SystemDiagnosticsService>();
+                services.AddTransient<IDashboardService, DashboardService>();
+                
+                services.AddSingleton<IUserConfigurationService, UserConfigurationService>();
+                
+                var defaultBarcodeOptions = new BarcodeScannerOptions();
+                context.Configuration.GetSection("BarcodeScanner").Bind(defaultBarcodeOptions);
+                var configService = new UserConfigurationService();
+                var activeBarcodeOptions = configService.LoadBarcodeScannerOptions(defaultBarcodeOptions);
+                
+                services.AddSingleton(activeBarcodeOptions);
+                services.AddSingleton<IBarcodeScannerService, BarcodeScannerService>();
 
                 services.AddTransient<MainWindow>();
                 services.AddTransient<LoginWindow>();
@@ -88,7 +109,12 @@ public partial class App : System.Windows.Application
                 services.AddTransient<PurchaseEditorWindow>();
                 services.AddTransient<ProductEditorViewModel>();
                 services.AddTransient<InventoryManagement.UI.Views.Products.ProductEditorWindow>();
-                services.AddTransient<InventoryViewModel>();
+                services.AddTransient<InventoryManagement.UI.ViewModels.Inventory.InventoryViewModel>();
+                services.AddTransient<InventoryManagement.UI.ViewModels.Inventory.StockAdjustmentViewModel>();
+                services.AddTransient<InventoryManagement.UI.ViewModels.Inventory.StockHistoryViewModel>();
+                services.AddTransient<InventoryManagement.UI.Views.Inventory.InventoryView>();
+                services.AddTransient<InventoryManagement.UI.Views.Inventory.StockAdjustmentWindow>();
+                services.AddTransient<InventoryManagement.UI.Views.Inventory.StockHistoryWindow>();
                 services.AddTransient<PurchasesViewModel>();
                 services.AddTransient<SalesViewModel>();
                 services.AddTransient<ReportsViewModel>();
@@ -101,116 +127,146 @@ public partial class App : System.Windows.Application
 
     protected override async void OnStartup(StartupEventArgs e)
     {
-        await _host.StartAsync();
-
-        using (var scope = _host.Services.CreateScope())
+        try
         {
-            var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-            var connString = config.GetConnectionString("DefaultConnection") ?? "";
-            var dbPath = connString.Replace("Data Source=", "").Trim();
-            if (!string.IsNullOrEmpty(dbPath))
+            await _host.StartAsync();
+
+            using (var scope = _host.Services.CreateScope())
             {
-                var dir = Path.GetDirectoryName(dbPath);
-                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+                var connString = config.GetConnectionString("DefaultConnection") ?? "";
+                var dbPath = connString.Replace("Data Source=", "").Split(';')[0].Trim();
+                
+                if (!string.IsNullOrEmpty(dbPath))
                 {
-                    Directory.CreateDirectory(dir);
+                    var dir = Path.GetDirectoryName(dbPath);
+                    if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    {
+                        Directory.CreateDirectory(dir);
+                    }
+                }
+
+                var dbContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+                
+                // Test database connectivity and integrity
+                if (!dbContext.Database.CanConnect())
+                {
+                    throw new Exception("Cannot connect to the SQLite database. Please verify the application has permission to access the data folder.");
+                }
+                
+                // Run SQLite integrity check
+                var integrityCmd = dbContext.Database.GetDbConnection().CreateCommand();
+                integrityCmd.CommandText = "PRAGMA integrity_check;";
+                dbContext.Database.OpenConnection();
+                var integrityResult = (string?)integrityCmd.ExecuteScalar();
+                if (integrityResult != "ok")
+                {
+                    throw new Exception($"Database integrity check failed ({integrityResult}). Please restore from a known-good backup.");
+                }
+                
+                _logger?.LogInfo("Database connection successful");
+                
+                dbContext.Database.Migrate();
+
+                // Seed base categories if none exist
+                if (!dbContext.Categories.Any())
+                {
+                    dbContext.Categories.AddRange(
+                        new InventoryManagement.Domain.Entities.Category { CategoryName = "Bags", Description = "Manufactured bags and totes" },
+                        new InventoryManagement.Domain.Entities.Category { CategoryName = "Crafts", Description = "Handmade crafts" },
+                        new InventoryManagement.Domain.Entities.Category { CategoryName = "Prints", Description = "Printed materials and souvenirs" },
+                        new InventoryManagement.Domain.Entities.Category { CategoryName = "Raw Materials", Description = "Raw materials for production (e.g. Fabric, Thread)" }
+                    );
+                    dbContext.SaveChanges();
+                }
+                else
+                {
+                    // Ensure new categories exist
+                    var existingCats = dbContext.Categories.Select(c => c.CategoryName).ToList();
+                    if (!existingCats.Contains("Bags")) dbContext.Categories.Add(new InventoryManagement.Domain.Entities.Category { CategoryName = "Bags", Description = "Manufactured bags and totes" });
+                    if (!existingCats.Contains("Crafts")) dbContext.Categories.Add(new InventoryManagement.Domain.Entities.Category { CategoryName = "Crafts", Description = "Handmade crafts" });
+                    if (!existingCats.Contains("Prints")) dbContext.Categories.Add(new InventoryManagement.Domain.Entities.Category { CategoryName = "Prints", Description = "Printed materials and souvenirs" });
+                    
+                    var electronics = dbContext.Categories.FirstOrDefault(c => c.CategoryName == "Electronics");
+                    if (electronics != null && !dbContext.Products.Any(p => p.CategoryId == electronics.CategoryId))
+                        dbContext.Categories.Remove(electronics);
+
+                    var food = dbContext.Categories.FirstOrDefault(c => c.CategoryName == "Food & Beverage");
+                    if (food != null && !dbContext.Products.Any(p => p.CategoryId == food.CategoryId))
+                        dbContext.Categories.Remove(food);
+
+                    dbContext.SaveChanges();
+                }
+
+                if (!dbContext.Units.Any())
+                {
+                    dbContext.Units.AddRange(
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "pcs", Symbol = "pcs" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "roll", Symbol = "roll" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "m", Symbol = "m" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "kg", Symbol = "kg" },
+                        new InventoryManagement.Domain.Entities.Unit { UnitName = "box", Symbol = "box" }
+                    );
+                    dbContext.SaveChanges();
+                }
+                else
+                {
+                    var existingUnits = dbContext.Units.Select(u => u.UnitName).ToList();
+                    if (!existingUnits.Contains("pcs")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "pcs", Symbol = "pcs" });
+                    if (!existingUnits.Contains("roll")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "roll", Symbol = "roll" });
+                    if (!existingUnits.Contains("m")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "m", Symbol = "m" });
+                    
+                    var oldPiece = dbContext.Units.FirstOrDefault(u => u.UnitName == "Piece");
+                    if (oldPiece != null) {
+                        oldPiece.UnitName = "pcs";
+                        oldPiece.Symbol = "pcs";
+                    }
+                    dbContext.SaveChanges();
+                }
+
+                if (!dbContext.Users.Any())
+                {
+                    var role = new InventoryManagement.Domain.Entities.Role { RoleName = "Administrator", Description = "Full access" };
+                    dbContext.Roles.Add(role);
+                    
+                    var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+                    var user = new InventoryManagement.Domain.Entities.User
+                    {
+                        Username = "admin",
+                        PasswordHash = passwordHasher.HashPassword("admin123"),
+                        FullName = "System Administrator",
+                        Role = role,
+                        IsActive = true
+                    };
+                    dbContext.Users.Add(user);
+                    dbContext.SaveChanges();
                 }
             }
 
-            var dbContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
-            dbContext.Database.Migrate();
-
-                        // Seed base categories if none exist
-            if (!dbContext.Categories.Any())
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
+            if (loginWindow.ShowDialog() == true)
             {
-                dbContext.Categories.AddRange(
-                    new InventoryManagement.Domain.Entities.Category { CategoryName = "Bags", Description = "Manufactured bags and totes" },
-                    new InventoryManagement.Domain.Entities.Category { CategoryName = "Crafts", Description = "Handmade crafts" },
-                    new InventoryManagement.Domain.Entities.Category { CategoryName = "Prints", Description = "Printed materials and souvenirs" },
-                    new InventoryManagement.Domain.Entities.Category { CategoryName = "Raw Materials", Description = "Raw materials for production (e.g. Fabric, Thread)" }
-                );
-                dbContext.SaveChanges();
+                var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+                mainWindow.Show();
+                ShutdownMode = ShutdownMode.OnLastWindowClose;
+                _logger?.LogInfo("Application started successfully");
             }
             else
             {
-                // Ensure new categories exist
-                var existingCats = dbContext.Categories.Select(c => c.CategoryName).ToList();
-                if (!existingCats.Contains("Bags")) dbContext.Categories.Add(new InventoryManagement.Domain.Entities.Category { CategoryName = "Bags", Description = "Manufactured bags and totes" });
-                if (!existingCats.Contains("Crafts")) dbContext.Categories.Add(new InventoryManagement.Domain.Entities.Category { CategoryName = "Crafts", Description = "Handmade crafts" });
-                if (!existingCats.Contains("Prints")) dbContext.Categories.Add(new InventoryManagement.Domain.Entities.Category { CategoryName = "Prints", Description = "Printed materials and souvenirs" });
-                
-                // Optionally remove old ones if unused
-                var electronics = dbContext.Categories.FirstOrDefault(c => c.CategoryName == "Electronics");
-                if (electronics != null && !dbContext.Products.Any(p => p.CategoryId == electronics.CategoryId))
-                    dbContext.Categories.Remove(electronics);
-
-                var food = dbContext.Categories.FirstOrDefault(c => c.CategoryName == "Food & Beverage");
-                if (food != null && !dbContext.Products.Any(p => p.CategoryId == food.CategoryId))
-                    dbContext.Categories.Remove(food);
-
-                dbContext.SaveChanges();
+                _logger?.LogInfo("Application shut down from login screen");
+                Shutdown();
             }
 
-                        if (!dbContext.Units.Any())
-            {
-                dbContext.Units.AddRange(
-                    new InventoryManagement.Domain.Entities.Unit { UnitName = "pcs", Symbol = "pcs" },
-                    new InventoryManagement.Domain.Entities.Unit { UnitName = "roll", Symbol = "roll" },
-                    new InventoryManagement.Domain.Entities.Unit { UnitName = "m", Symbol = "m" },
-                    new InventoryManagement.Domain.Entities.Unit { UnitName = "kg", Symbol = "kg" },
-                    new InventoryManagement.Domain.Entities.Unit { UnitName = "box", Symbol = "box" }
-                );
-                dbContext.SaveChanges();
-            }
-            else
-            {
-                // Ensure new units exist
-                var existingUnits = dbContext.Units.Select(u => u.UnitName).ToList();
-                if (!existingUnits.Contains("pcs")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "pcs", Symbol = "pcs" });
-                if (!existingUnits.Contains("roll")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "roll", Symbol = "roll" });
-                if (!existingUnits.Contains("m")) dbContext.Units.Add(new InventoryManagement.Domain.Entities.Unit { UnitName = "m", Symbol = "m" });
-                
-                var oldPiece = dbContext.Units.FirstOrDefault(u => u.UnitName == "Piece");
-                if (oldPiece != null) {
-                    oldPiece.UnitName = "pcs";
-                    oldPiece.Symbol = "pcs";
-                }
-                dbContext.SaveChanges();
-            }
-
-            if (!dbContext.Users.Any())
-            {
-                var role = new InventoryManagement.Domain.Entities.Role { RoleName = "Administrator", Description = "Full access" };
-                dbContext.Roles.Add(role);
-                
-                var passwordHasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-                var user = new InventoryManagement.Domain.Entities.User
-                {
-                    Username = "admin",
-                    PasswordHash = passwordHasher.HashPassword("admin123"),
-                    FullName = "System Administrator",
-                    Role = role,
-                    IsActive = true
-                };
-                dbContext.Users.Add(user);
-                dbContext.SaveChanges();
-            }
+            base.OnStartup(e);
         }
-
-        ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        var loginWindow = _host.Services.GetRequiredService<LoginWindow>();
-        if (loginWindow.ShowDialog() == true)
+        catch (Exception ex)
         {
-            var mainWindow = _host.Services.GetRequiredService<MainWindow>();
-            mainWindow.Show();
-            ShutdownMode = ShutdownMode.OnLastWindowClose;
+            _logger?.LogError("Application startup failed", ex);
+            MessageBox.Show($"Inventory Management could not open its database or encountered a startup error:\n\n{ex.Message}\n\nPlease verify that the application has permission to access the data folder or contact your administrator.", 
+                "Startup Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1);
         }
-        else
-        {
-            Shutdown();
-        }
-
-        base.OnStartup(e);
     }
 
     protected override async void OnExit(ExitEventArgs e)
@@ -219,22 +275,16 @@ public partial class App : System.Windows.Application
         {
             var backupService = _host.Services.GetRequiredService<IBackupService>();
             await backupService.CreateAutoBackupAsync();
-            await backupService.EnforceRetentionPolicyAsync(7);
+            await backupService.EnforceRetentionPolicyAsync(30);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger?.LogError("Error during auto-backup on exit", ex);
+        }
         
+        _logger?.LogInfo("Application shutting down");
         await _host.StopAsync();
         _host.Dispose();
         base.OnExit(e);
     }
 }
-
-
-
-
-
-
-
-
-
-

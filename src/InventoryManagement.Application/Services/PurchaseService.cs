@@ -12,14 +12,18 @@ namespace InventoryManagement.Application.Services;
 public class PurchaseService : IPurchaseService
 {
     private readonly IInventoryDbContext _context;
+    private readonly IAuthorizationService _authzService;
 
-    public PurchaseService(IInventoryDbContext context)
+    public PurchaseService(IInventoryDbContext context, IAuthorizationService authzService)
     {
         _context = context;
+        _authzService = authzService;
     }
 
     public async Task<Purchase> CreateDraftPurchaseAsync(int supplierId, int createdBy, string? notes)
     {
+        if (!_authzService.HasPermission(Permission.CreatePurchase))
+            throw new UnauthorizedAccessException("You do not have permission to create purchases.");
         var purchase = new Purchase
         {
             SupplierId = supplierId,
@@ -88,8 +92,11 @@ public class PurchaseService : IPurchaseService
         if (purchase == null) throw new Exception("Purchase not found.");
         if (purchase.Status == PurchaseStatus.Completed) throw new Exception("Purchase is already completed.");
 
-        // We use a transaction to ensure database integrity as specified
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync();
+        if (!_authzService.HasPermission(Permission.CompletePurchase))
+            throw new UnauthorizedAccessException("You do not have permission to complete purchases.");
+
+        var isInMemory = ((DbContext)_context).Database.ProviderName?.Contains("InMemory") == true;
+        var transaction = isInMemory ? null : await ((DbContext)_context).Database.BeginTransactionAsync();
         try
         {
             purchase.Status = PurchaseStatus.Completed;
@@ -116,7 +123,7 @@ public class PurchaseService : IPurchaseService
             var audit = new AuditLog
             {
                 UserId = userId,
-                Action = "CompletePurchase",
+                Action = "PurchaseCompleted",
                 TableName = "Purchases",
                 RecordId = purchase.PurchaseId.ToString(),
                 Description = $"Completed purchase {purchase.PurchaseNumber} and generated stock transactions."
@@ -124,12 +131,16 @@ public class PurchaseService : IPurchaseService
             _context.AuditLogs.Add(audit);
 
             await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            if (transaction != null) await transaction.CommitAsync();
         }
         catch
         {
-            await transaction.RollbackAsync();
+            if (transaction != null) await transaction.RollbackAsync();
             throw;
+        }
+        finally
+        {
+            if (transaction != null) await transaction.DisposeAsync();
         }
     }
 
@@ -171,6 +182,70 @@ public class PurchaseService : IPurchaseService
         purchase.TotalAmount -= item.TotalCost;
         
         await _context.SaveChangesAsync();
+    }
+    public async Task<InventoryManagement.Application.DTOs.Criteria.PagedResult<Purchase>> SearchPurchasesAsync(InventoryManagement.Application.DTOs.Criteria.PurchaseSearchCriteria criteria)
+    {
+        var query = _context.Purchases
+            .Include(p => p.Supplier)
+            .AsQueryable();
+
+        if (criteria.DateFrom.HasValue)
+        {
+            query = query.Where(p => p.PurchaseDate >= criteria.DateFrom.Value);
+        }
+        if (criteria.DateTo.HasValue)
+        {
+            var endOfDay = criteria.DateTo.Value.AddDays(1);
+            query = query.Where(p => p.PurchaseDate < endOfDay);
+        }
+        if (criteria.SupplierId.HasValue)
+        {
+            query = query.Where(p => p.SupplierId == criteria.SupplierId.Value);
+        }
+        if (criteria.UserId.HasValue)
+        {
+            query = query.Where(p => p.CreatedBy == criteria.UserId.Value);
+        }
+        if (criteria.Status.HasValue)
+        {
+            query = query.Where(p => p.Status == criteria.Status.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(criteria.SearchText))
+        {
+            var text = criteria.SearchText.Trim();
+            query = query.Where(p => p.PurchaseNumber.Contains(text) || (p.Supplier != null && p.Supplier.SupplierName.Contains(text)));
+        }
+
+        var totalCount = await query.CountAsync();
+
+        if (string.IsNullOrEmpty(criteria.SortColumn))
+        {
+            query = query.OrderByDescending(p => p.PurchaseDate);
+        }
+        else
+        {
+            query = criteria.SortColumn switch
+            {
+                "PurchaseNumber" => criteria.SortDescending ? query.OrderByDescending(p => p.PurchaseNumber) : query.OrderBy(p => p.PurchaseNumber),
+                "PurchaseDate" => criteria.SortDescending ? query.OrderByDescending(p => p.PurchaseDate) : query.OrderBy(p => p.PurchaseDate),
+                "Supplier" => criteria.SortDescending ? query.OrderByDescending(p => p.Supplier != null ? p.Supplier.SupplierName : string.Empty) : query.OrderBy(p => p.Supplier != null ? p.Supplier.SupplierName : string.Empty),
+                "TotalAmount" => criteria.SortDescending ? query.OrderByDescending(p => p.TotalAmount) : query.OrderBy(p => p.TotalAmount),
+                _ => query.OrderByDescending(p => p.PurchaseDate)
+            };
+        }
+
+        var items = await query
+            .Skip((criteria.Page - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .ToListAsync();
+
+        return new InventoryManagement.Application.DTOs.Criteria.PagedResult<Purchase>
+        {
+            Items = items,
+            TotalCount = totalCount,
+            Page = criteria.Page,
+            PageSize = criteria.PageSize
+        };
     }
 }
 

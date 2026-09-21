@@ -1,0 +1,5 @@
+- `[x]` **Phase 5 — Barcode Scanner Infrastructure**
+- `[x]` **Phase 6 — Stock Adjustments**
+- `[x]` **Phase 7 — Sales, Purchasing & Returns Integration**
+- `[x]` **Phase 8 — Dashboard & Business Metrics**
+- `[x]` **Phase 9 — Audit logging**

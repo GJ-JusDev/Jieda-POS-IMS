@@ -7,5 +7,5 @@ public interface IBackupService
     Task<string> CreateManualBackupAsync(string targetFilePath);
     Task<string> CreateAutoBackupAsync();
     Task RestoreBackupAsync(string backupFilePath);
-    Task EnforceRetentionPolicyAsync(int daysToKeep);
+    Task EnforceRetentionPolicyAsync(int maxBackups = 30);
 }

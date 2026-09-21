@@ -50,13 +50,59 @@ public class PurchasesViewModel : ViewModelBase
         await LoadPurchasesAsync();
     }
 
+    private string _searchText = string.Empty;
+    public string SearchText
+    {
+        get => _searchText;
+        set { SetProperty(ref _searchText, value); }
+    }
+
+    private DateTime? _dateFrom;
+    public DateTime? DateFrom
+    {
+        get => _dateFrom;
+        set { SetProperty(ref _dateFrom, value); }
+    }
+
+    private DateTime? _dateTo;
+    public DateTime? DateTo
+    {
+        get => _dateTo;
+        set { SetProperty(ref _dateTo, value); }
+    }
+
+    private string _emptyMessage = string.Empty;
+    public string EmptyMessage
+    {
+        get => _emptyMessage;
+        set { SetProperty(ref _emptyMessage, value); }
+    }
+
     private async Task LoadPurchasesAsync()
     {
-        var result = await _purchaseService.GetAllPurchasesAsync();
+        var criteria = new InventoryManagement.Application.DTOs.Criteria.PurchaseSearchCriteria
+        {
+            SearchText = SearchText,
+            DateFrom = DateFrom,
+            DateTo = DateTo,
+            Page = 1,
+            PageSize = 1000
+        };
+
+        var result = await _purchaseService.SearchPurchasesAsync(criteria);
         Purchases.Clear();
-        foreach (var p in result)
+        foreach (var p in result.Items)
         {
             Purchases.Add(p);
+        }
+
+        if (!Purchases.Any())
+        {
+            EmptyMessage = "No purchases found.";
+        }
+        else
+        {
+            EmptyMessage = string.Empty;
         }
     }
 
